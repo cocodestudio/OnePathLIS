@@ -1,0 +1,507 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Search, Plus, Edit2, Trash2, FlaskConical, AlertTriangle,
+  CheckCircle2, Loader2, Layers, IndianRupee, ChevronDown, ChevronRight
+} from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
+
+interface Test {
+  id: string; name: string; category: string; type: string; price: number;
+  unit: string | null; genderRefType: string; refRangeMin: number | null; refRangeMax: number | null;
+  refRangeMinMale: number | null; refRangeMaxMale: number | null;
+  refRangeMinFemale: number | null; refRangeMaxFemale: number | null;
+  subTests?: Test[];
+}
+
+interface SubTestState {
+  id?: string;
+  name: string;
+  unit: string;
+  genderRefType: string;
+  refRangeMin: string;
+  refRangeMax: string;
+  refRangeMinMale: string;
+  refRangeMaxMale: string;
+  refRangeMinFemale: string;
+  refRangeMaxFemale: string;
+}
+
+export default function TestMasterPage() {
+  const toast = useToast();
+  const [tests, setTests] = useState<Test[]>([]);
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingTest, setEditingTest] = useState<Test | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Test | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("CBC");
+  const [customCategory, setCustomCategory] = useState("");
+  const [type, setType] = useState("Pathology");
+  const [price, setPrice] = useState("");
+  
+  const [subTests, setSubTests] = useState<SubTestState[]>([]);
+
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const subtestsEndRef = useRef<HTMLDivElement>(null);
+
+  const dynamicCategories = Array.from(new Set(tests.map(t => t.category).filter(Boolean)));
+  const standardCategories = Array.from(new Set([...dynamicCategories, "Hematology", "Biochemistry", "Hormones", "Vitamins", "Radiology", "Cardiology", "Pathology Packages", "Other"]));
+  const standardTypes = ["Pathology", "Radiology", "Cardiology", "Other"];
+
+  useEffect(() => { fetchTests(); }, []);
+
+  const fetchTests = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/tests");
+      if (res.ok) setTests(await res.json());
+    } catch (err) {
+      console.error("Failed to fetch tests:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenAddDialog = () => {
+    setEditingTest(null);
+    setName(""); setCategory(standardCategories[0]); setCustomCategory(""); setType("Pathology"); 
+    setPrice(""); 
+    setSubTests([{
+      name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: ""
+    }]);
+    setError(null); setSuccess(null); setDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (test: Test) => {
+    setEditingTest(test);
+    setName(test.name);
+    setCategory(standardCategories.includes(test.category) ? test.category : "Other");
+    setCustomCategory(standardCategories.includes(test.category) ? "" : test.category);
+    setType(test.type || "Pathology");
+    setPrice(test.price.toString()); 
+    
+    if (test.subTests && test.subTests.length > 0) {
+      setSubTests(test.subTests.map(sub => ({
+        id: sub.id,
+        name: sub.name,
+        unit: sub.unit || "",
+        genderRefType: sub.genderRefType || "BOTH",
+        refRangeMin: sub.refRangeMin?.toString() || "",
+        refRangeMax: sub.refRangeMax?.toString() || "",
+        refRangeMinMale: sub.refRangeMinMale?.toString() || "",
+        refRangeMaxMale: sub.refRangeMaxMale?.toString() || "",
+        refRangeMinFemale: sub.refRangeMinFemale?.toString() || "",
+        refRangeMaxFemale: sub.refRangeMaxFemale?.toString() || "",
+      })));
+    } else {
+      setSubTests([{
+        // Do NOT use test.id here, because this is a new subtest, not the parent itself.
+        name: test.name,
+        unit: test.unit || "",
+        genderRefType: test.genderRefType || "BOTH",
+        refRangeMin: test.refRangeMin?.toString() || "",
+        refRangeMax: test.refRangeMax?.toString() || "",
+        refRangeMinMale: test.refRangeMinMale?.toString() || "",
+        refRangeMaxMale: test.refRangeMaxMale?.toString() || "",
+        refRangeMinFemale: test.refRangeMinFemale?.toString() || "",
+        refRangeMaxFemale: test.refRangeMaxFemale?.toString() || "",
+      }]);
+    }
+    
+    setError(null); setSuccess(null); setDialogOpen(true);
+  };
+
+  const handleAddSubTest = () => {
+    setSubTests([...subTests, {
+      name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: ""
+    }]);
+    setTimeout(() => {
+      subtestsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
+  const handleRemoveSubTest = (index: number) => {
+    setSubTests(subTests.filter((_, i) => i !== index));
+  };
+
+  const updateSubTest = (index: number, field: keyof SubTestState, value: string) => {
+    const updated = [...subTests];
+    updated[index] = { ...updated[index], [field]: value };
+    setSubTests(updated);
+  };
+
+  const handleSaveTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null); setSuccess(null); setSaving(true);
+    const finalCategory = category === "Other" ? customCategory.trim() : category;
+    
+    if (!name || !finalCategory || price === "") {
+      setError("Please fill in main test details."); setSaving(false); return;
+    }
+
+    if (subTests.length === 0) {
+      setError("Please add at least one parameter/sub-test."); setSaving(false); return;
+    }
+
+    for (const sub of subTests) {
+      if (!sub.name) {
+        setError("Please fill in the name for all parameters."); setSaving(false); return;
+      }
+    }
+
+    try {
+      const url = editingTest ? `/api/tests/${editingTest.id}` : "/api/tests";
+      const method = editingTest ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: name.trim(), category: finalCategory, type, price: parseFloat(price),
+          subTests: subTests.map(sub => ({
+            id: sub.id,
+            name: sub.name.trim(),
+            unit: sub.unit.trim(),
+            genderRefType: sub.genderRefType,
+            refRangeMin: sub.refRangeMin,
+            refRangeMax: sub.refRangeMax,
+            refRangeMinMale: sub.refRangeMinMale,
+            refRangeMaxMale: sub.refRangeMaxMale,
+            refRangeMinFemale: sub.refRangeMinFemale,
+            refRangeMaxFemale: sub.refRangeMaxFemale,
+          }))
+        }),
+      });
+      const result = await res.json();
+      if (res.ok) { setSuccess("Test saved successfully."); fetchTests(); setTimeout(() => setDialogOpen(false), 800); }
+      else setError(result.error || "Failed to save test.");
+    } catch {
+      setError("Network error.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDeleteTest = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/tests/${deleteTarget.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Test deleted", `"${deleteTarget.name}" was removed from the catalog.`);
+        setDeleteTarget(null);
+        fetchTests();
+      } else {
+        toast.error("Delete failed", "The test could not be deleted. It may be in use by a report.");
+      }
+    } catch {
+      toast.error("Network error", "Unable to reach the server. Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const filteredTests = tests.filter((t) => {
+    const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = selectedCategory === "ALL" || t.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const categories = Array.from(new Set(tests.map((t) => t.category)));
+  const avgCost = tests.length ? tests.reduce((a, t) => a + t.price, 0) / tests.length : 0;
+
+  const getCategoryColor = (cat: string) => {
+    switch (cat.toUpperCase()) {
+      case "CBC": case "HEMATOLOGY": return "bg-primary/10 text-primary";
+      case "LFT": case "BIOCHEMISTRY": return "bg-gold/12 text-gold";
+      case "KFT": return "bg-secondary/15 text-secondary";
+      case "THYROID": return "bg-accent text-accent-foreground";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in pb-10">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Catalog</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Test Master</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage main packages, parameters, and pricing.</p>
+        </div>
+        <div className="flex gap-2">
+          <Button onClick={handleOpenAddDialog} size="sm" className="h-10"><Plus className="h-4 w-4" /> New Test Package</Button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-card border border-border/70 rounded-xl p-5 shadow-card flex items-center justify-between">
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Main Tests</p><p className="font-display text-3xl font-semibold text-foreground mt-1 tnum">{tests.length}</p></div>
+          <span className="flex items-center justify-center w-11 h-11 rounded-lg bg-accent text-primary"><FlaskConical className="h-5 w-5" /></span>
+        </div>
+        <div className="bg-card border border-border/70 rounded-xl p-5 shadow-card flex items-center justify-between">
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Categories</p><p className="font-display text-3xl font-semibold text-foreground mt-1 tnum">{categories.length}</p></div>
+          <span className="flex items-center justify-center w-11 h-11 rounded-lg bg-secondary/15 text-secondary"><Layers className="h-5 w-5" /></span>
+        </div>
+        <div className="bg-card border border-border/70 rounded-xl p-5 shadow-card flex items-center justify-between">
+          <div><p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Average Price</p><p className="font-display text-3xl font-semibold text-gold mt-1 tnum">₹{avgCost.toFixed(0)}</p></div>
+          <span className="flex items-center justify-center w-11 h-11 rounded-lg bg-gold/12 text-gold"><IndianRupee className="h-5 w-5" /></span>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-card border border-border/70 rounded-xl shadow-card overflow-hidden">
+        <div className="p-4 border-b border-border/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex gap-2 overflow-x-auto max-w-full pb-1 sm:pb-0">
+            <button onClick={() => setSelectedCategory("ALL")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition-all ${selectedCategory === "ALL" ? "gradient-primary text-primary-foreground border-transparent" : "bg-card border-border text-foreground hover:border-primary/40"}`}>All</button>
+            {categories.map((cat) => (
+              <button key={cat} onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition-all ${selectedCategory === cat ? "gradient-primary text-primary-foreground border-transparent" : "bg-card border-border text-foreground hover:border-primary/40"}`}>{cat}</button>
+            ))}
+          </div>
+          <div className="relative w-full sm:max-w-xs shrink-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+            <Input placeholder="Search tests…" className="pl-9 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex flex-col gap-3 p-4">
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-10 w-full rounded-md" />
+              <Skeleton className="h-10 w-full rounded-md" />
+            </div>
+          ) : filteredTests.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground"><FlaskConical className="h-9 w-9 mx-auto mb-2 opacity-25" /><p className="text-xs font-medium">No tests match your selection.</p></div>
+          ) : (
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-muted/30 border-b border-border/60">
+                  <th className="px-6 py-3.5 w-10"></th>
+                  {["Main Test / Package", "Category", "Sub Tests", "Price", ""].map((h, i) => (
+                    <th key={h + i} className={`px-4 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground ${i === 3 ? "text-right" : ""} ${i === 4 ? "text-right" : ""}`}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTests.map((test) => (
+                  <React.Fragment key={test.id}>
+                    <tr className={`border-b border-border/30 last:border-0 hover:bg-muted/25 transition-colors group cursor-pointer ${expandedRows[test.id] ? "bg-muted/20" : ""}`} onClick={() => toggleRow(test.id)}>
+                      <td className="px-6 py-3.5 text-muted-foreground">
+                        {test.subTests && test.subTests.length > 0 && (
+                          expandedRows[test.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="font-semibold text-foreground text-sm">{test.name}</p>
+                        <p className="font-mono text-[10px] text-muted-foreground mt-0.5">{test.id.slice(0, 8).toUpperCase()}</p>
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${getCategoryColor(test.category)}`}>{test.category}</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-sm text-muted-foreground font-medium">
+                        {test.subTests ? test.subTests.length : 0} Parameters
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-mono text-sm font-semibold text-foreground">₹{test.price.toFixed(0)}</td>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); handleOpenEditDialog(test); }} className="p-2 rounded-md text-muted-foreground hover:text-primary hover:bg-accent transition-all" title="Edit"><Edit2 className="h-3.5 w-3.5" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(test); }} className="p-2 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedRows[test.id] && test.subTests && test.subTests.length > 0 && (
+                      <tr className="bg-muted/10 border-b border-border/30">
+                        <td></td>
+                        <td colSpan={5} className="p-0">
+                          <div className="pl-6 pr-4 py-3">
+                            <table className="w-full text-left text-xs">
+                              <thead>
+                                <tr className="border-b border-border/40 text-muted-foreground">
+                                  <th className="pb-2 font-medium">Parameter Name</th>
+                                  <th className="pb-2 font-medium text-center">Unit</th>
+                                  <th className="pb-2 font-medium text-right">Ref. Range</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {test.subTests.map(sub => (
+                                  <tr key={sub.id} className="border-b border-border/20 last:border-0">
+                                    <td className="py-2.5 font-medium text-foreground">{sub.name}</td>
+                                    <td className="py-2.5 text-center text-muted-foreground">{sub.unit}</td>
+                                    <td className="py-2.5 text-right font-mono text-muted-foreground">
+                                      {sub.genderRefType === "GENDER_SPECIFIC" ? "Gender Specific" : `${sub.refRangeMin} – ${sub.refRangeMax}`}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Add/Edit modal */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 py-4 border-b border-border/60 bg-muted/20 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground"><FlaskConical className="h-5 w-5" /></div>
+              <div>
+                <DialogTitle className="text-lg">{editingTest ? "Edit Test Package" : "New Diagnostic Package"}</DialogTitle>
+                <DialogDescription>Create a main test and define its parameters.</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <form id="test-form" onSubmit={handleSaveTest} className="space-y-6">
+              {error && <div className="flex items-center gap-2 rounded-lg bg-destructive/8 border border-destructive/20 p-3 text-xs text-destructive font-medium"><AlertTriangle className="h-4 w-4 shrink-0" /><p>{error}</p></div>}
+              {success && <div className="flex items-center gap-2 rounded-lg bg-accent border border-primary/20 p-3 text-xs text-primary font-medium"><CheckCircle2 className="h-4 w-4 shrink-0" /><p>{success}</p></div>}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5"><Label>Main Test Name</Label><Input placeholder="e.g. Complete Blood Count (CBC)" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+                <div className="space-y-1.5"><Label>Package Price (₹)</Label><Input type="number" step="0.01" placeholder="e.g. 500" value={price} onChange={(e) => setPrice(e.target.value)} className="font-mono" required /></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{standardCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {category === "Other" && (
+                  <div className="space-y-1.5"><Label>Custom Category</Label><Input placeholder="e.g. Serology" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} required /></div>
+                )}
+              </div>
+
+              <div className="border-t border-border/60 pt-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="font-semibold text-sm">Test Parameters (Sub-tests)</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Add individual parameters that belong to this test.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={handleAddSubTest} className="h-8">
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Parameter
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {subTests.map((sub, index) => (
+                    <div key={index} className="bg-muted/20 border border-border/70 rounded-xl p-4 relative group">
+                      {subTests.length > 1 && (
+                        <button type="button" onClick={() => handleRemoveSubTest(index)} className="absolute right-3 top-3 p-1.5 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                      
+                      <div className="grid grid-cols-12 gap-4 mb-3 pr-8">
+                        <div className="col-span-8 space-y-1.5">
+                          <Label className="text-xs">Parameter Name</Label>
+                          <Input placeholder="e.g. Hemoglobin" value={sub.name} onChange={(e) => updateSubTest(index, "name", e.target.value)} className="h-8 text-sm" required />
+                        </div>
+                        <div className="col-span-4 space-y-1.5">
+                          <Label className="text-xs">Unit</Label>
+                          <Input placeholder="e.g. g/dL" value={sub.unit} onChange={(e) => updateSubTest(index, "unit", e.target.value)} className="h-8 text-sm" />
+                        </div>
+                      </div>
+
+                      <div className="bg-background rounded-lg border border-border/50 p-3">
+                        <div className="flex justify-between items-center mb-3">
+                          <Label className="text-xs text-muted-foreground">Reference Range</Label>
+                          <Select value={sub.genderRefType} onValueChange={(val) => updateSubTest(index, "genderRefType", val)}>
+                            <SelectTrigger className="h-7 text-xs w-[130px] border-border"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="BOTH">Universal</SelectItem>
+                              <SelectItem value="GENDER_SPECIFIC">Gender Specific</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {sub.genderRefType === "BOTH" ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1"><Label className="text-[10px]">Min</Label><Input type="number" step="0.0001" placeholder="12.0" value={sub.refRangeMin} onChange={(e) => updateSubTest(index, "refRangeMin", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                            <div className="space-y-1"><Label className="text-[10px]">Max</Label><Input type="number" step="0.0001" placeholder="16.0" value={sub.refRangeMax} onChange={(e) => updateSubTest(index, "refRangeMax", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Min</Label><Input type="number" step="0.0001" value={sub.refRangeMinMale} onChange={(e) => updateSubTest(index, "refRangeMinMale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                              <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Max</Label><Input type="number" step="0.0001" value={sub.refRangeMaxMale} onChange={(e) => updateSubTest(index, "refRangeMaxMale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1"><Label className="text-[10px] text-pink-500">Female Min</Label><Input type="number" step="0.0001" value={sub.refRangeMinFemale} onChange={(e) => updateSubTest(index, "refRangeMinFemale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                              <div className="space-y-1"><Label className="text-[10px] text-pink-500">Female Max</Label><Input type="number" step="0.0001" value={sub.refRangeMaxFemale} onChange={(e) => updateSubTest(index, "refRangeMaxFemale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={subtestsEndRef} />
+                </div>
+              </div>
+            </form>
+          </div>
+          
+          <DialogFooter className="px-6 py-4 border-t border-border/60 bg-muted/20 shrink-0">
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button type="submit" form="test-form" disabled={saving}>
+              {saving ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving…</>) : editingTest ? "Update Package" : "Create Package"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Test Package</DialogTitle>
+            <DialogDescription>
+              Delete <strong className="text-foreground">{deleteTarget?.name}</strong> and all its parameters from the catalog? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteTest} disabled={deleting}>
+              {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting…</> : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

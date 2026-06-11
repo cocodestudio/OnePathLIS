@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Lab {
+  id        String    @id @default(uuid())
+  name      String
+  email     String    @unique
+  address   String
+  logoUrl            String?
+  printBgImage       String?
+  printHeaderHeight  Int      @default(40)
+  printFooterHeight  Int      @default(40)
+  printMarginLeft    Int      @default(40)
+  printMarginRight   Int      @default(40)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  users              User[]
+  patients  Patient[]
+  bills     Bill[]
+  reports   Report[]
+  tests     Test[]
+}
+
+model User {
+  id        String   @id @default(uuid())
+  labId     String
+  lab       Lab      @relation(fields: [labId], references: [id], onDelete: Cascade)
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("STAFF") // ADMIN, STAFF, PATHOLOGIST
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Patient {
+  id         String   @id @default(uuid())
+  customId   String   @unique // E.g., LAB-2026-0001
+  labId      String
+  lab        Lab      @relation(fields: [labId], references: [id], onDelete: Cascade)
+  name       String
+  designation String?  @default("Mr.")
+  age        Int
+  gender     String   @default("Male") // Male, Female, Other
+  phone      String
+  refDoctor  String   @default("Self")
+  address    String?
+  collectedAt String?  @default("Lab")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bills      Bill[]
+  reports    Report[]
+}
+
+model Bill {
+  id         String   @id @default(uuid())
+  customId   String   @unique // E.g., BILL-2026-0001
+  labId      String
+  lab        Lab      @relation(fields: [labId], references: [id], onDelete: Cascade)
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  total      Float
+  discount   Float    @default(0.0)
+  status     String   @default("UNPAID") // PAID, UNPAID, PARTIAL
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  reports    Report[]
+}
+
+model Report {
+  id         String       @id @default(uuid())
+  customId   String       @unique // E.g., REP-2026-0001
+  labId      String
+  lab        Lab          @relation(fields: [labId], references: [id], onDelete: Cascade)
+  billId     String
+  bill       Bill         @relation(fields: [billId], references: [id], onDelete: Cascade)
+  patientId  String
+  patient    Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  status     String       @default("PENDING") // PENDING, COMPLETED
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  results    ReportTest[]
+}
+
+model Test {
+  id          String       @id @default(uuid())
+  labId       String
+  lab         Lab          @relation(fields: [labId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Test?        @relation("TestHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subTests    Test[]       @relation("TestHierarchy")
+  name              String
+  category          String       // CBC, LFT, KFT, Thyroid, etc.
+  type              String       @default("Pathology")
+  price             Float        @default(0)
+  unit              String?
+  genderRefType     String       @default("BOTH") // BOTH, GENDER_SPECIFIC
+  refRangeMin       Float?
+  refRangeMax       Float?
+  refRangeMinMale   Float?
+  refRangeMaxMale   Float?
+  refRangeMinFemale Float?
+  refRangeMaxFemale Float?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  reportTests ReportTest[]
+}
+
+model ReportTest {
+  id          String   @id @default(uuid())
+  reportId    String
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  testId      String
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  resultValue String?  // String to accommodate ranges, but usually parsed as float for comparison
+  isAbnormal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

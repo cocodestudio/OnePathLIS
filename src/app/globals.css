@@ -2,26 +2,186 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/*
+  ════════════════════════════════════════════════════════════
+  OnePath Lab — "Clinical Apothecary" design system
+  Deep forest-emerald ink · warm bone paper · sharp gold accent
+  Display: Fraunces (serif) · Body: Geist · Data: Geist Mono
+  ════════════════════════════════════════════════════════════
+*/
 
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 42 30% 96%;
+    --foreground: 165 28% 10%;
+
+    --card: 40 42% 99%;
+    --card-foreground: 165 28% 10%;
+
+    --popover: 40 42% 99%;
+    --popover-foreground: 165 28% 10%;
+
+    --primary: 160 58% 23%;
+    --primary-foreground: 42 42% 97%;
+
+    --secondary: 160 42% 31%;
+    --secondary-foreground: 42 42% 97%;
+
+    --muted: 42 20% 91%;
+    --muted-foreground: 165 9% 42%;
+
+    --accent: 160 28% 91%;
+    --accent-foreground: 160 58% 20%;
+
+    --gold: 36 72% 48%;
+    --gold-foreground: 38 60% 8%;
+
+    --destructive: 4 68% 47%;
+    --destructive-foreground: 42 42% 97%;
+
+    --border: 42 16% 85%;
+    --input: 42 16% 85%;
+    --ring: 160 58% 28%;
+
+    --radius: 0.75rem;
+
+    --shadow-card: 0 1px 2px hsl(165 20% 10% / 0.04), 0 4px 16px -6px hsl(165 20% 10% / 0.08);
+    --shadow-elevated: 0 4px 24px -8px hsl(165 25% 10% / 0.14), 0 1px 3px hsl(165 20% 10% / 0.05);
+    --shadow-overlay: 0 24px 50px -16px hsl(165 30% 8% / 0.22), 0 4px 10px hsl(165 20% 10% / 0.06);
+    --gradient-primary: linear-gradient(135deg, hsl(160 58% 27%), hsl(166 56% 17%));
+    --gradient-gold: linear-gradient(135deg, hsl(40 78% 56%), hsl(34 72% 46%));
+  }
+
+  .dark {
+    --background: 165 26% 6%;
+    --foreground: 42 24% 92%;
+
+    --card: 165 21% 9%;
+    --card-foreground: 42 24% 92%;
+
+    --popover: 165 21% 9%;
+    --popover-foreground: 42 24% 92%;
+
+    --primary: 158 50% 46%;
+    --primary-foreground: 165 40% 6%;
+
+    --secondary: 158 38% 36%;
+    --secondary-foreground: 42 24% 95%;
+
+    --muted: 165 16% 15%;
+    --muted-foreground: 42 11% 60%;
+
+    --accent: 160 28% 16%;
+    --accent-foreground: 158 50% 62%;
+
+    --gold: 40 74% 58%;
+    --gold-foreground: 40 50% 8%;
+
+    --destructive: 4 58% 50%;
+    --destructive-foreground: 42 24% 95%;
+
+    --border: 165 14% 16%;
+    --input: 165 14% 16%;
+    --ring: 158 50% 46%;
+
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.3), 0 4px 18px -6px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 6px 28px -8px hsl(0 0% 0% / 0.5), 0 1px 3px hsl(0 0% 0% / 0.3);
+    --shadow-overlay: 0 24px 56px -16px hsl(0 0% 0% / 0.6), 0 4px 10px hsl(0 0% 0% / 0.3);
+    --gradient-primary: linear-gradient(135deg, hsl(158 50% 42%), hsl(166 48% 26%));
+    --gradient-gold: linear-gradient(135deg, hsl(42 76% 60%), hsl(36 70% 48%));
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-geist), system-ui, sans-serif;
+    font-feature-settings: "cv01", "ss01";
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight;
+  }
+  /* Fraunces optical tuning for display headings */
+  .font-display {
+    font-optical-sizing: auto;
+    font-variation-settings: "SOFT" 0, "opsz" 40;
+    letter-spacing: -0.01em;
+  }
 }
 
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-muted-foreground/20 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/35; }
+
+/* ── Utilities ───────────────────────────────────────────── */
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+  .shadow-overlay { box-shadow: var(--shadow-overlay); }
+
+  .gradient-primary { background-image: var(--gradient-primary); }
+  .gradient-gold { background-image: var(--gradient-gold); }
+
+  .text-gradient-primary {
+    background-image: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
+
+  .glow-primary {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.1), 0 8px 24px -8px hsl(var(--primary) / 0.45);
+  }
+  .ring-inset-top {
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.12);
+  }
+
+  .glass {
+    background: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+  }
+
+  /* Tabular figures for data/numbers */
+  .tnum { font-variant-numeric: tabular-nums; }
+}
+
+/* ── Atmospheric login background ────────────────────────── */
+.bg-apothecary {
+  background-color: hsl(42 30% 96%);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 15% 10%, hsl(160 45% 88%) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 90% 90%, hsl(38 70% 88%) 0%, transparent 50%);
+}
+.dark .bg-apothecary {
+  background-color: hsl(165 26% 6%);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 15% 10%, hsl(160 40% 12%) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 90% 90%, hsl(38 40% 12%) 0%, transparent 50%);
+}
+
+/* Subtle paper grain on cards is achieved via borders/shadows, kept clean */
+
+/* ── Animations ──────────────────────────────────────────── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ── Focus ring ──────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring) / 0.6);
+  outline-offset: 2px;
+}
+
+/* ── Print ───────────────────────────────────────────────── */
+@media print {
+  body { background: white !important; color: black !important; }
+  .no-print { display: none !important; }
 }
