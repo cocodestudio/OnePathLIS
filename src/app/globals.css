@@ -96,13 +96,20 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-geist), system-ui, sans-serif;
-    font-feature-settings: "cv01", "ss01";
+    font-feature-settings: "cv01", "ss01", "cv02", "cv03", "cv04";
   }
   h1, h2, h3, h4, h5, h6 {
     @apply tracking-tight;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   /* Fraunces optical tuning for display headings */
   .font-display {

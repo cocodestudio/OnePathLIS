@@ -14,7 +14,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, category, type, price, unit, genderRefType, refRangeMin, refRangeMax, refRangeMinMale, refRangeMaxMale, refRangeMinFemale, refRangeMaxFemale, subTests } = body;
+    const { name, category, interpretation, fieldType, type, price, unit, genderRefType, refRangeMin, refRangeMax, refRangeMinMale, refRangeMaxMale, refRangeMinFemale, refRangeMaxFemale, subTests } = body;
 
     const test = await prisma.test.findUnique({
       where: { id: params.id },
@@ -31,7 +31,9 @@ export async function PUT(
         data: {
           name: name !== undefined ? name : test.name,
           category: category !== undefined ? category : test.category,
+          fieldType: fieldType !== undefined ? fieldType : test.fieldType,
           type: type !== undefined ? type : test.type,
+          interpretation: interpretation !== undefined ? interpretation : test.interpretation,
           price: price !== undefined ? parseFloat(price) : test.price,
           unit: unit !== undefined ? unit : test.unit,
           genderRefType: genderRefType !== undefined ? genderRefType : test.genderRefType,
@@ -61,6 +63,8 @@ export async function PUT(
           const subData = {
             name: sub.name,
             category: category !== undefined ? category : test.category,
+            fieldType: sub.fieldType || "Single Field",
+            interpretation: sub.interpretation || null,
             type: type !== undefined ? type : test.type,
             price: 0,
             unit: sub.unit,
@@ -78,8 +82,47 @@ export async function PUT(
               where: { id: sub.id },
               data: subData
             });
+
+            if (sub.subTests && Array.isArray(sub.subTests)) {
+              const incomingSubIds = sub.subTests.map((s: any) => s.id).filter(Boolean);
+              await tx.test.deleteMany({
+                where: { parentId: sub.id, id: { notIn: incomingSubIds } }
+              });
+
+              for (const subsub of sub.subTests) {
+                const subsubData = {
+                  name: subsub.name,
+                  category: category !== undefined ? category : test.category,
+                  type: type !== undefined ? type : test.type,
+                  price: 0,
+                  unit: subsub.unit,
+                  genderRefType: subsub.genderRefType || "BOTH",
+                  refRangeMin: subsub.refRangeMin ? parseFloat(subsub.refRangeMin) : null,
+                  refRangeMax: subsub.refRangeMax ? parseFloat(subsub.refRangeMax) : null,
+                  refRangeMinMale: subsub.refRangeMinMale !== undefined && subsub.refRangeMinMale !== "" ? parseFloat(subsub.refRangeMinMale) : null,
+                  refRangeMaxMale: subsub.refRangeMaxMale !== undefined && subsub.refRangeMaxMale !== "" ? parseFloat(subsub.refRangeMaxMale) : null,
+                  refRangeMinFemale: subsub.refRangeMinFemale !== undefined && subsub.refRangeMinFemale !== "" ? parseFloat(subsub.refRangeMinFemale) : null,
+                  refRangeMaxFemale: subsub.refRangeMaxFemale !== undefined && subsub.refRangeMaxFemale !== "" ? parseFloat(subsub.refRangeMaxFemale) : null,
+                };
+                
+                if (subsub.id) {
+                  await tx.test.update({ where: { id: subsub.id }, data: subsubData });
+                } else {
+                  await tx.test.create({
+                    data: {
+                      id: `${params.id}-${sub.name}-${subsub.name}-${Date.now()}`.replace(/\s+/g, "_"),
+                      labId: session.user.labId,
+                      parentId: sub.id,
+                      ...subsubData
+                    }
+                  });
+                }
+              }
+            } else {
+              await tx.test.deleteMany({ where: { parentId: sub.id } });
+            }
           } else {
-            await tx.test.create({
+            const createdSub = await tx.test.create({
               data: {
                 id: `${params.id}-${sub.name}-${Date.now()}`.replace(/\s+/g, "_"),
                 labId: session.user.labId,
@@ -87,13 +130,35 @@ export async function PUT(
                 ...subData
               }
             });
+
+            if (sub.subTests && Array.isArray(sub.subTests) && sub.subTests.length > 0) {
+              await tx.test.createMany({
+                data: sub.subTests.map((subsub: any, idx: number) => ({
+                  id: `${params.id}-${sub.name}-${subsub.name}-${Date.now()}-${idx}`.replace(/\s+/g, "_"),
+                  labId: session.user.labId,
+                  parentId: createdSub.id,
+                  name: subsub.name,
+                  category: category !== undefined ? category : test.category,
+                  type: type !== undefined ? type : test.type,
+                  price: 0,
+                  unit: subsub.unit,
+                  genderRefType: subsub.genderRefType || "BOTH",
+                  refRangeMin: subsub.refRangeMin ? parseFloat(subsub.refRangeMin) : null,
+                  refRangeMax: subsub.refRangeMax ? parseFloat(subsub.refRangeMax) : null,
+                  refRangeMinMale: subsub.refRangeMinMale !== undefined && subsub.refRangeMinMale !== "" ? parseFloat(subsub.refRangeMinMale) : null,
+                  refRangeMaxMale: subsub.refRangeMaxMale !== undefined && subsub.refRangeMaxMale !== "" ? parseFloat(subsub.refRangeMaxMale) : null,
+                  refRangeMinFemale: subsub.refRangeMinFemale !== undefined && subsub.refRangeMinFemale !== "" ? parseFloat(subsub.refRangeMinFemale) : null,
+                  refRangeMaxFemale: subsub.refRangeMaxFemale !== undefined && subsub.refRangeMaxFemale !== "" ? parseFloat(subsub.refRangeMaxFemale) : null,
+                }))
+              });
+            }
           }
         }
       }
 
       return tx.test.findUnique({
         where: { id: params.id },
-        include: { subTests: true }
+        include: { subTests: { include: { subTests: true } } }
       });
     });
 

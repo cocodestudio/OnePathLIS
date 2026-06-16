@@ -98,7 +98,7 @@ export default function SettingsPage() {
         <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground flex items-center gap-3">
           Lab Settings
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage global preferences and print layouts for your lab.</p>
+        <p className="text-sm text-muted-foreground mt-1">Configure your lab preferences and report layout.</p>
       </div>
 
       <div className="bg-card border border-border/70 rounded-xl shadow-card overflow-hidden">
@@ -119,6 +119,7 @@ export default function SettingsPage() {
             
             {settings.bgImage ? (
               <div className="relative w-full max-w-lg h-64 bg-muted rounded-xl border border-border overflow-hidden group shadow-inner">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={settings.bgImage} className="w-full h-full object-contain" alt="Background Preview" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button onClick={() => setSettings(prev => ({ ...prev, bgImage: null }))} className="bg-destructive text-destructive-foreground px-4 py-2 rounded-lg text-sm font-semibold shadow-elevated hover:bg-destructive/90 flex items-center gap-2 transition-transform active:scale-95">

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,14 +10,22 @@ import {
 } from "@/components/ui/select";
 import {
   Search, Plus, Edit2, Trash2, FlaskConical, AlertTriangle,
-  CheckCircle2, Loader2, Layers, IndianRupee, ChevronDown, ChevronRight
+  CheckCircle2, Loader2, Layers, IndianRupee, ChevronDown, ChevronRight, FileText
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TipTapEditor } from "@/components/tiptap-editor";
 import { useToast } from "@/components/ui/toast";
 
+const PREDEFINED_UNITS = [
+  "g/dL", "mg/dL", "µg/dL", "U/L", "IU/L", "mEq/L", "mmol/L", "µmol/L", "pmol/L",
+  "%", "/cumm", "/µL", "x10^6/µL", "x10^3/µL", "/HPF", "cells/cumm", "mg/24h",
+  "mL/min", "fl", "pg", "ng/mL", "ng/dL", "mIU/mL", "nmol/L", "Sec", "Min", "Ratio"
+];
+
 interface Test {
-  id: string; name: string; category: string; type: string; price: number;
+  id: string; name: string; category: string; fieldType: string; type: string; price: number;
+  interpretation?: string;
   unit: string | null; genderRefType: string; refRangeMin: number | null; refRangeMax: number | null;
   refRangeMinMale: number | null; refRangeMaxMale: number | null;
   refRangeMinFemale: number | null; refRangeMaxFemale: number | null;
@@ -34,6 +43,9 @@ interface SubTestState {
   refRangeMaxMale: string;
   refRangeMinFemale: string;
   refRangeMaxFemale: string;
+  subTests?: SubTestState[];
+  fieldType?: string;
+  interpretation?: string;
 }
 
 export default function TestMasterPage() {
@@ -51,6 +63,9 @@ export default function TestMasterPage() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("CBC");
   const [customCategory, setCustomCategory] = useState("");
+  const [interpretation, setInterpretation] = useState("");
+  const [interpretationModalOpen, setInterpretationModalOpen] = useState(false);
+  const [customEditorActiveSubIndex, setCustomEditorActiveSubIndex] = useState<number | null>(null);
   const [type, setType] = useState("Pathology");
   const [price, setPrice] = useState("");
   
@@ -82,10 +97,11 @@ export default function TestMasterPage() {
   const handleOpenAddDialog = () => {
     setEditingTest(null);
     setName(""); setCategory(standardCategories[0]); setCustomCategory(""); setType("Pathology"); 
-    setPrice(""); 
+    setPrice("");
+    setInterpretation(""); 
     setSubTests([{
       name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
-      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: ""
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: "", fieldType: "Single Field"
     }]);
     setError(null); setSuccess(null); setDialogOpen(true);
   };
@@ -96,7 +112,8 @@ export default function TestMasterPage() {
     setCategory(standardCategories.includes(test.category) ? test.category : "Other");
     setCustomCategory(standardCategories.includes(test.category) ? "" : test.category);
     setType(test.type || "Pathology");
-    setPrice(test.price.toString()); 
+    setPrice(test.price.toString());
+    setInterpretation(test.interpretation || ""); 
     
     if (test.subTests && test.subTests.length > 0) {
       setSubTests(test.subTests.map(sub => ({
@@ -110,6 +127,20 @@ export default function TestMasterPage() {
         refRangeMaxMale: sub.refRangeMaxMale?.toString() || "",
         refRangeMinFemale: sub.refRangeMinFemale?.toString() || "",
         refRangeMaxFemale: sub.refRangeMaxFemale?.toString() || "",
+        fieldType: sub.fieldType || "Single Field",
+        interpretation: sub.interpretation || "",
+        subTests: sub.subTests ? sub.subTests.map(subsub => ({
+          id: subsub.id,
+          name: subsub.name,
+          unit: subsub.unit || "",
+          genderRefType: subsub.genderRefType || "BOTH",
+          refRangeMin: subsub.refRangeMin?.toString() || "",
+          refRangeMax: subsub.refRangeMax?.toString() || "",
+          refRangeMinMale: subsub.refRangeMinMale?.toString() || "",
+          refRangeMaxMale: subsub.refRangeMaxMale?.toString() || "",
+          refRangeMinFemale: subsub.refRangeMinFemale?.toString() || "",
+          refRangeMaxFemale: subsub.refRangeMaxFemale?.toString() || "",
+        })) : []
       })));
     } else {
       setSubTests([{
@@ -146,6 +177,34 @@ export default function TestMasterPage() {
   const updateSubTest = (index: number, field: keyof SubTestState, value: string) => {
     const updated = [...subTests];
     updated[index] = { ...updated[index], [field]: value };
+    
+    if (field === "fieldType" && value === "Custom Editor" && !updated[index].name) {
+      updated[index].name = "Report Template";
+    }
+    
+    setSubTests(updated);
+  };
+
+
+  const handleAddSubSubTest = (index: number) => {
+    const updated = [...subTests];
+    if (!updated[index].subTests) updated[index].subTests = [];
+    updated[index].subTests!.push({
+      name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: ""
+    });
+    setSubTests(updated);
+  };
+
+  const handleRemoveSubSubTest = (index: number, subIndex: number) => {
+    const updated = [...subTests];
+    updated[index].subTests = updated[index].subTests!.filter((_, i) => i !== subIndex);
+    setSubTests(updated);
+  };
+
+  const updateSubSubTest = (index: number, subIndex: number, field: keyof SubTestState, value: string) => {
+    const updated = [...subTests];
+    updated[index].subTests![subIndex] = { ...updated[index].subTests![subIndex], [field]: value };
     setSubTests(updated);
   };
 
@@ -174,7 +233,7 @@ export default function TestMasterPage() {
       const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          name: name.trim(), category: finalCategory, type, price: parseFloat(price),
+          name: name.trim(), category: finalCategory, fieldType: "Group", type, price: parseFloat(price), interpretation,
           subTests: subTests.map(sub => ({
             id: sub.id,
             name: sub.name.trim(),
@@ -186,6 +245,20 @@ export default function TestMasterPage() {
             refRangeMaxMale: sub.refRangeMaxMale,
             refRangeMinFemale: sub.refRangeMinFemale,
             refRangeMaxFemale: sub.refRangeMaxFemale,
+            fieldType: sub.fieldType || "Single Field",
+            interpretation: sub.interpretation || null,
+            subTests: sub.fieldType === "Multiple Field" && sub.subTests ? sub.subTests.map(ss => ({
+              id: ss.id,
+              name: ss.name.trim(),
+              unit: ss.unit.trim(),
+              genderRefType: ss.genderRefType,
+              refRangeMin: ss.refRangeMin,
+              refRangeMax: ss.refRangeMax,
+              refRangeMinMale: ss.refRangeMinMale,
+              refRangeMaxMale: ss.refRangeMaxMale,
+              refRangeMinFemale: ss.refRangeMinFemale,
+              refRangeMaxFemale: ss.refRangeMaxFemale,
+            })) : undefined
           }))
         }),
       });
@@ -243,12 +316,17 @@ export default function TestMasterPage() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
+      <datalist id="units-list">
+        {PREDEFINED_UNITS.map(unit => (
+          <option key={unit} value={unit} />
+        ))}
+      </datalist>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Catalog</p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Test Master</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage main packages, parameters, and pricing.</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Tests & Packages</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage lab tests, their parameters, and pricing.</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={handleOpenAddDialog} size="sm" className="h-10"><Plus className="h-4 w-4" /> New Test Package</Button>
@@ -406,6 +484,13 @@ export default function TestMasterPage() {
                   <div className="space-y-1.5"><Label>Custom Category</Label><Input placeholder="e.g. Serology" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} required /></div>
                 )}
               </div>
+              
+              <div className="flex justify-start">
+                <Button type="button" variant="outline" onClick={() => setInterpretationModalOpen(true)} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  View Interpretation
+                </Button>
+              </div>
 
               <div className="border-t border-border/60 pt-5">
                 <div className="flex items-center justify-between mb-4">
@@ -428,16 +513,32 @@ export default function TestMasterPage() {
                       )}
                       
                       <div className="grid grid-cols-12 gap-4 mb-3 pr-8">
-                        <div className="col-span-8 space-y-1.5">
-                          <Label className="text-xs">Parameter Name</Label>
-                          <Input placeholder="e.g. Hemoglobin" value={sub.name} onChange={(e) => updateSubTest(index, "name", e.target.value)} className="h-8 text-sm" required />
-                        </div>
-                        <div className="col-span-4 space-y-1.5">
-                          <Label className="text-xs">Unit</Label>
-                          <Input placeholder="e.g. g/dL" value={sub.unit} onChange={(e) => updateSubTest(index, "unit", e.target.value)} className="h-8 text-sm" />
+                        {sub.fieldType !== "Custom Editor" && (
+                          <div className={sub.fieldType === "Multiple Field" ? "col-span-8 space-y-1.5" : "col-span-5 space-y-1.5"}>
+                            <Label className="text-xs">Parameter Name</Label>
+                            <Input placeholder="e.g. Hemoglobin" value={sub.name} onChange={(e) => updateSubTest(index, "name", e.target.value)} className="h-8 text-sm" required />
+                          </div>
+                        )}
+                        {sub.fieldType !== "Multiple Field" && sub.fieldType !== "Custom Editor" && (
+                          <div className="col-span-3 space-y-1.5">
+                            <Label className="text-xs">Unit</Label>
+                            <Input list="units-list" placeholder="e.g. g/dL" value={sub.unit} onChange={(e) => updateSubTest(index, "unit", e.target.value)} className="h-8 text-sm" />
+                          </div>
+                        )}
+                        <div className={sub.fieldType === "Custom Editor" ? "col-span-12 space-y-1.5" : "col-span-4 space-y-1.5"}>
+                          <Label className="text-xs">Field Type</Label>
+                          <Select value={sub.fieldType || "Single Field"} onValueChange={(val) => updateSubTest(index, "fieldType", val)}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Single Field">Single Field</SelectItem>
+                              <SelectItem value="Multiple Field">Multiple Field</SelectItem>
+                              <SelectItem value="Custom Editor">Custom Editor</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
 
+                      {(!sub.fieldType || sub.fieldType === "Single Field") ? (
                       <div className="bg-background rounded-lg border border-border/50 p-3">
                         <div className="flex justify-between items-center mb-3">
                           <Label className="text-xs text-muted-foreground">Reference Range</Label>
@@ -468,6 +569,81 @@ export default function TestMasterPage() {
                           </div>
                         )}
                       </div>
+                      ) : sub.fieldType === "Custom Editor" ? (
+                        <div className="bg-background rounded-lg border border-border/50 p-3 mt-4">
+                          <div className="flex justify-between items-center mb-2">
+                            <Label className="text-xs text-muted-foreground font-semibold">Custom Editor Template</Label>
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => setCustomEditorActiveSubIndex(index)}
+                              className="h-7 text-[10px] px-3 font-semibold border-primary/20 text-primary hover:bg-primary/5"
+                            >
+                              <FileText className="h-3 w-3 mr-1.5" />
+                              Open Editor
+                            </Button>
+                          </div>
+                          <div 
+                            className="min-h-[100px] max-h-[150px] overflow-hidden border border-border/60 rounded-md bg-card/50 p-3 text-xs text-muted-foreground relative"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-card/90 pointer-events-none" />
+                            {sub.interpretation ? (
+                              <div dangerouslySetInnerHTML={{ __html: sub.interpretation }} className="opacity-70 scale-90 origin-top-left" />
+                            ) : (
+                              <div className="flex items-center justify-center h-full text-muted-foreground/50 italic pt-6">No template designed yet</div>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-2">
+                            Design the layout exactly how you want it to appear in the report. This template will be loaded automatically when entering results.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="mt-4 border-t border-border/50 pt-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <Label className="text-xs font-semibold text-muted-foreground">Sub-Parameters</Label>
+                            <Button type="button" variant="outline" size="sm" onClick={() => handleAddSubSubTest(index)} className="h-6 text-[10px] px-2"><Plus className="h-3 w-3 mr-1"/> Add Sub-Parameter</Button>
+                          </div>
+                          <div className="space-y-3">
+                            {sub.subTests && sub.subTests.map((subsub, sIdx) => (
+                              <div key={sIdx} className="bg-background rounded-lg border border-border/50 p-3 relative group/sub">
+                                <button type="button" onClick={() => handleRemoveSubSubTest(index, sIdx)} className="absolute right-2 top-2 p-1 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover/sub:opacity-100 transition-all"><Trash2 className="h-3 w-3" /></button>
+                                <div className="grid grid-cols-2 gap-3 mb-2 pr-6">
+                                  <div className="space-y-1"><Label className="text-[10px]">Name</Label><Input placeholder="Sub Name" value={subsub.name} onChange={(e) => updateSubSubTest(index, sIdx, "name", e.target.value)} className="h-7 text-xs" required /></div>
+                                  <div className="space-y-1"><Label className="text-[10px]">Unit</Label><Input list="units-list" placeholder="Unit" value={subsub.unit} onChange={(e) => updateSubSubTest(index, sIdx, "unit", e.target.value)} className="h-7 text-xs" /></div>
+                                </div>
+                                <div className="flex justify-between items-center mb-2 mt-2 border-t border-border/30 pt-2">
+                                  <Label className="text-[10px] text-muted-foreground">Ref Range</Label>
+                                  <Select value={subsub.genderRefType} onValueChange={(val) => updateSubSubTest(index, sIdx, "genderRefType", val)}>
+                                    <SelectTrigger className="h-6 text-[10px] w-[110px] border-border"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="BOTH">Universal</SelectItem>
+                                      <SelectItem value="GENDER_SPECIFIC">Gender</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                {subsub.genderRefType === "BOTH" ? (
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1"><Label className="text-[10px]">Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMin} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMin", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                    <div className="space-y-1"><Label className="text-[10px]">Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMax} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMax", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMinMale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMinMale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                      <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMaxMale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMaxMale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="space-y-1"><Label className="text-[10px] text-pink-500">Fem Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMinFemale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMinFemale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                      <div className="space-y-1"><Label className="text-[10px] text-pink-500">Fem Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMaxFemale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMaxFemale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                   <div ref={subtestsEndRef} />
@@ -500,6 +676,34 @@ export default function TestMasterPage() {
               {deleting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Deleting…</> : "Delete"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Interpretation Modal */}
+      <Dialog open={interpretationModalOpen} onOpenChange={setInterpretationModalOpen}>
+        <DialogContent hideClose className="max-w-4xl p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogTitle className="sr-only">Interpretation Editor</DialogTitle>
+          <TipTapEditor 
+            value={interpretation} 
+            onChange={newContent => setInterpretation(newContent)} 
+            onSave={() => setInterpretationModalOpen(false)}
+            onClose={() => setInterpretationModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Editor Dialog */}
+      <Dialog open={customEditorActiveSubIndex !== null} onOpenChange={(o) => !o && setCustomEditorActiveSubIndex(null)}>
+        <DialogContent hideClose className="max-w-4xl p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogTitle className="sr-only">Custom Editor</DialogTitle>
+          {customEditorActiveSubIndex !== null && (
+            <TipTapEditor 
+              title="Custom Editor"
+              value={subTests[customEditorActiveSubIndex].interpretation || ""} 
+              onChange={(html) => updateSubTest(customEditorActiveSubIndex, "interpretation", html)} 
+              onSave={() => setCustomEditorActiveSubIndex(null)}
+              onClose={() => setCustomEditorActiveSubIndex(null)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

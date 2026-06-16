@@ -15,8 +15,16 @@ import {
   Filter, X, Eye, Plus, Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
-interface Test { name: string; category: string; }
+interface Test { 
+  name: string; 
+  category: string; 
+  fieldType?: string;
+  parentId?: string | null;
+  parent?: Test | null;
+}
 interface ReportTest { id: string; resultValue: string | null; isAbnormal: boolean; test: Test; }
 interface Report {
   id: string; customId: string; status: string; createdAt: string;
@@ -42,6 +50,10 @@ export default function ReportsListPage() {
   const [printReport, setPrintReport] = useState<ReportSheetData | null>(null);
   const [printSettings, setPrintSettings] = useState<{ bgImage: string | null; headerHeight: number; footerHeight: number; marginLeft: number; marginRight: number } | undefined>(undefined);
   const [printingId, setPrintingId] = useState<string | null>(null);
+
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [useCustomLetterpad, setUseCustomLetterpad] = useState(true);
+  const [pendingPrintData, setPendingPrintData] = useState<{ report: ReportSheetData; settings: any } | null>(null);
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -76,15 +88,22 @@ export default function ReportsListPage() {
       const res = await fetch(`/api/reports/${id}`);
       if (res.ok) {
         const data = await res.json();
-        setPrintReport({ ...data, lab: data.lab || DEFAULT_LAB });
-        if (data.lab) {
-          setPrintSettings({
-            bgImage: data.lab.printBgImage || null,
-            headerHeight: data.lab.printHeaderHeight ?? 40,
-            footerHeight: data.lab.printFooterHeight ?? 40,
-            marginLeft: data.lab.printMarginLeft ?? 40,
-            marginRight: data.lab.printMarginRight ?? 40,
-          });
+        const hasBg = !!(data.lab && data.lab.printBgImage);
+        const fetchedSettings = {
+          bgImage: data.lab?.printBgImage || null,
+          headerHeight: data.lab?.printHeaderHeight ?? 40,
+          footerHeight: data.lab?.printFooterHeight ?? 40,
+          marginLeft: data.lab?.printMarginLeft ?? 40,
+          marginRight: data.lab?.printMarginRight ?? 40,
+        };
+
+        if (hasBg) {
+          setPendingPrintData({ report: { ...data, lab: data.lab || DEFAULT_LAB }, settings: fetchedSettings });
+          setUseCustomLetterpad(true);
+          setShowPrintOptions(true);
+        } else {
+          setPrintSettings(fetchedSettings);
+          setPrintReport({ ...data, lab: data.lab || DEFAULT_LAB });
         }
       } else {
         toastError("Could not load report", "Failed to fetch report data for printing.");
@@ -94,6 +113,17 @@ export default function ReportsListPage() {
     } finally {
       setPrintingId(null);
     }
+  };
+
+  const handleConfirmPrint = () => {
+    if (!pendingPrintData) return;
+    setPrintSettings({
+      ...pendingPrintData.settings,
+      bgImage: useCustomLetterpad ? pendingPrintData.settings.bgImage : null,
+    });
+    setPrintReport(pendingPrintData.report);
+    setShowPrintOptions(false);
+    setPendingPrintData(null);
   };
 
   const categories = Array.from(new Set(reports.flatMap((r) => r.results.map((res) => res.test.category)))).filter(Boolean);
@@ -129,10 +159,10 @@ export default function ReportsListPage() {
         <div>
           <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Diagnostics</p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-1">Record diagnostic values and authorize finalized patient reports.</p>
+          <p className="text-sm text-muted-foreground mt-1">Enter test results and generate patient reports.</p>
         </div>
         <Link href="/dashboard/patients/register">
-          <Button size="sm" className="h-10"><Plus className="h-4 w-4" /> New Diagnostics</Button>
+          <Button size="sm" className="h-10"><Plus className="h-4 w-4" /> New Patient</Button>
         </Link>
       </div>
 
@@ -212,9 +242,12 @@ export default function ReportsListPage() {
                       </td>
                       <td className="px-6 py-4 hidden lg:table-cell">
                         <div className="flex flex-wrap gap-1.5 max-w-[260px]">
-                          {rep.results.slice(0, 4).map((r) => (
-                            <span key={r.id} className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold border ${r.isAbnormal ? "bg-destructive/8 text-destructive border-destructive/20" : "bg-accent text-accent-foreground border-transparent"}`}>{r.test.name}</span>
-                          ))}
+                          {rep.results.slice(0, 4).map((r) => {
+                            const name = r.test.fieldType === "Custom Editor" && r.test.name === "Report Template" && r.test.parent ? r.test.parent.name : r.test.name;
+                            return (
+                              <span key={r.id} className={`inline-flex px-2 py-0.5 rounded-md text-[10px] font-semibold border ${r.isAbnormal ? "bg-destructive/8 text-destructive border-destructive/20" : "bg-accent text-accent-foreground border-transparent"}`}>{name}</span>
+                            );
+                          })}
                           {rep.results.length > 4 && <span className="text-[10px] text-muted-foreground font-medium px-1 py-0.5">+{rep.results.length - 4}</span>}
                         </div>
                       </td>
@@ -289,6 +322,32 @@ export default function ReportsListPage() {
           <ReportSheet ref={printRef} report={printReport} settings={printSettings} />
         </div>
       )}
+
+      {/* Print Options Dialog */}
+      <Dialog open={showPrintOptions} onOpenChange={setShowPrintOptions}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Print Options</DialogTitle>
+            <DialogDescription>Choose how you want to print this report.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+              <Checkbox 
+                checked={useCustomLetterpad} 
+                onCheckedChange={(checked) => setUseCustomLetterpad(checked as boolean)} 
+              />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-foreground">Print with custom letterpad</p>
+                <p className="text-xs text-muted-foreground">Uses the lab's configured background image.</p>
+              </div>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPrintOptions(false)}>Cancel</Button>
+            <Button onClick={handleConfirmPrint}><Printer className="h-4 w-4 mr-2" /> Continue Print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

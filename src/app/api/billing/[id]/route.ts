@@ -14,23 +14,12 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { discount, status } = body;
+    const { discount, status, paidAmount } = body;
 
     const bill = await prisma.bill.findFirst({
       where: {
         id: params.id,
         labId: session.user.labId,
-      },
-      include: {
-        reports: {
-          include: {
-            results: {
-              include: {
-                test: true,
-              },
-            },
-          },
-        },
       },
     });
 
@@ -38,23 +27,24 @@ export async function PUT(
       return NextResponse.json({ error: "Invoice file not found." }, { status: 404 });
     }
 
-    // Sum base price of all tests listed under this bill's reports
-    let originalTestTotal = 0;
-    bill.reports.forEach((rep) => {
-      rep.results.forEach((res) => {
-        originalTestTotal += res.test.price;
-      });
-    });
-
     const finalDiscount = discount !== undefined ? parseFloat(discount) : bill.discount;
-    const finalTotal = Math.max(0, originalTestTotal - finalDiscount);
-    const finalStatus = status !== undefined ? status : bill.status;
+    const finalTotal = Math.max(0, bill.total + bill.discount - finalDiscount);
+    const finalPaidAmount = paidAmount !== undefined ? parseFloat(paidAmount) : bill.paidAmount;
+
+    let finalStatus = "UNPAID";
+    const balance = finalTotal - finalPaidAmount;
+    if (balance <= 0) {
+      finalStatus = "PAID";
+    } else if (finalPaidAmount > 0) {
+      finalStatus = "PARTIAL";
+    }
 
     const updatedBill = await prisma.bill.update({
       where: { id: params.id },
       data: {
         discount: finalDiscount,
         total: finalTotal,
+        paidAmount: finalPaidAmount,
         status: finalStatus,
       },
     });

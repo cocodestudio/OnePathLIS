@@ -11,7 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent,
+  Dialog, DialogContent, DialogTitle
 } from "@/components/ui/dialog";
 
 interface Test {
@@ -83,9 +83,9 @@ export default function RegisterPatientPage() {
     })();
   }, []);
 
-  const uniqueDoctors = Array.from(new Set(patientsList.map(p => p.refDoctor).filter(Boolean)));
+  const uniqueDoctors = Array.from(new Set(patientsList.map(p => p.refDoctor).filter((d): d is string => Boolean(d))));
   if (!uniqueDoctors.includes("Self")) uniqueDoctors.unshift("Self");
-  const uniqueAddresses = Array.from(new Set(patientsList.map(p => p.collectedAt).filter(Boolean)));
+  const uniqueAddresses = Array.from(new Set(patientsList.map(p => p.collectedAt).filter((a): a is string => Boolean(a))));
   if (!uniqueAddresses.includes("Lab")) uniqueAddresses.unshift("Lab");
 
   const handleRegisterPatient = async (e: React.FormEvent) => {
@@ -203,9 +203,9 @@ export default function RegisterPatientPage() {
   return (
     <div className="max-w-[1080px] mx-auto space-y-7 pb-12 animate-fade-in">
       <div>
-        <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Intake</p>
+        <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Registration</p>
         <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Register Patient</h1>
-        <p className="text-sm text-muted-foreground mt-1">Onboard a new patient and generate their diagnostic invoice.</p>
+        <p className="text-sm text-muted-foreground mt-1">Add a new patient and create their bill.</p>
       </div>
 
       {!bookingSuccess ? (
@@ -232,7 +232,7 @@ export default function RegisterPatientPage() {
             <div className="md:col-span-8 space-y-6">
               <div className="bg-card p-6 rounded-xl border border-border/70 shadow-card">
                 <h3 className="font-display text-lg font-semibold text-foreground mb-5 flex items-center justify-between border-b border-border/60 pb-3">
-                  <span className="flex items-center gap-2"><User className="h-[18px] w-[18px] text-primary" /> Registration Information</span>
+                  <span className="flex items-center gap-2"><User className="h-[18px] w-[18px] text-primary" /> Patient Details</span>
                   <button type="button" onClick={() => { setTempRequiredFields(requiredFields); setIsSettingsOpen(true); }} className="text-muted-foreground hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-muted/50">
                     <Settings className="h-4 w-4" />
                   </button>
@@ -461,6 +461,7 @@ export default function RegisterPatientPage() {
       {/* Test selection modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+          <DialogTitle className="sr-only">Select Tests</DialogTitle>
           <div className="flex items-center gap-3 px-6 py-4 border-b border-border/60 shrink-0 bg-muted/30">
             <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground">
               <FlaskConical className="h-5 w-5" />
@@ -580,6 +581,7 @@ export default function RegisterPatientPage() {
       {/* Settings Modal */}
       <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
         <DialogContent className="max-w-md w-full max-h-[85vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Form Settings</DialogTitle>
           <div className="flex flex-col gap-4">
             <div>
               <h2 className="font-display text-lg font-semibold text-foreground flex items-center gap-2">

@@ -120,10 +120,10 @@ export default function PatientsPage() {
         <div>
           <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Directory</p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Patients</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage patient records and clinical history.</p>
+          <p className="text-sm text-muted-foreground mt-1">Manage your patient database.</p>
         </div>
         <Link href="/dashboard/patients/register">
-          <Button><UserPlus className="h-4 w-4" /> Register Intake</Button>
+          <Button><UserPlus className="h-4 w-4" /> Add Patient</Button>
         </Link>
       </div>
 

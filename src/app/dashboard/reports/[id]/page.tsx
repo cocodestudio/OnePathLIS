@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReportSheet, type ReportSheetData, type PrintSettings } from "@/components/report-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Printer, ArrowLeft, Edit, AlertCircle } from "lucide-react";
 
 const defaultPrintSettings: PrintSettings = {
@@ -23,6 +25,8 @@ export default function ReportDetailPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const [printSettings, setPrintSettings] = useState<PrintSettings>(defaultPrintSettings);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [useCustomLetterpad, setUseCustomLetterpad] = useState(true);
 
   const handlePrint = useReactToPrint({
     contentRef: reportRef,
@@ -32,6 +36,24 @@ export default function ReportDetailPage() {
   useEffect(() => { 
     if (reportId) fetchReport(); 
   }, [reportId]);
+
+  const triggerPrint = () => {
+    if (report?.lab?.printBgImage) {
+      setUseCustomLetterpad(true);
+      setShowPrintOptions(true);
+    } else {
+      handlePrint();
+    }
+  };
+
+  const handleConfirmPrint = () => {
+    setShowPrintOptions(false);
+    const bgImage = useCustomLetterpad ? (report?.lab?.printBgImage || null) : null;
+    setPrintSettings(prev => ({ ...prev, bgImage }));
+    setTimeout(() => {
+      handlePrint();
+    }, 100);
+  };
 
   const fetchReport = async () => {
     try {
@@ -94,7 +116,7 @@ export default function ReportDetailPage() {
         </div>
         <div className="flex gap-2">
           <Link href={`/dashboard/reports/${report.id}/edit`}><Button variant="outline" size="sm" className="h-9"><Edit className="h-4 w-4" /> Edit Results</Button></Link>
-          <Button onClick={() => handlePrint()} size="sm" className="h-9"><Printer className="h-4 w-4" /> Print / PDF</Button>
+          <Button onClick={triggerPrint} size="sm" className="h-9"><Printer className="h-4 w-4" /> Print / PDF</Button>
         </div>
       </div>
 
@@ -102,6 +124,32 @@ export default function ReportDetailPage() {
       <div className="bg-white border border-border/70 rounded-xl shadow-card p-2 overflow-x-auto">
         <ReportSheet ref={reportRef} report={report} settings={printSettings} />
       </div>
+
+      {/* Print Options Dialog */}
+      <Dialog open={showPrintOptions} onOpenChange={setShowPrintOptions}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Print Options</DialogTitle>
+            <DialogDescription>Choose how you want to print this report.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+              <Checkbox 
+                checked={useCustomLetterpad} 
+                onCheckedChange={(checked) => setUseCustomLetterpad(checked as boolean)} 
+              />
+              <div className="space-y-0.5">
+                <p className="text-sm font-medium text-foreground">Print with custom letterpad</p>
+                <p className="text-xs text-muted-foreground">Uses the lab's configured background image.</p>
+              </div>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPrintOptions(false)}>Cancel</Button>
+            <Button onClick={handleConfirmPrint}><Printer className="h-4 w-4 mr-2" /> Continue Print</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

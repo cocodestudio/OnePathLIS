@@ -14,7 +14,7 @@ import {
 interface Patient { name: string; customId: string; phone: string; }
 interface Report { customId: string; }
 interface Bill {
-  id: string; customId: string; total: number; discount: number;
+  id: string; customId: string; total: number; discount: number; paidAmount: number;
   status: string; createdAt: string; patient: Patient; reports: Report[];
 }
 
@@ -29,6 +29,7 @@ export default function BillingPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [discountVal, setDiscountVal] = useState("");
+  const [paidAmountVal, setPaidAmountVal] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("UNPAID");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +52,7 @@ export default function BillingPage() {
   const handleOpenEditDialog = (bill: Bill) => {
     setEditingBill(bill);
     setDiscountVal(bill.discount.toString());
+    setPaidAmountVal(bill.paidAmount ? bill.paidAmount.toString() : "0");
     setPaymentStatus(bill.status);
     setError(null);
     setSuccess(null);
@@ -67,7 +69,7 @@ export default function BillingPage() {
       const res = await fetch(`/api/billing/${editingBill.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discount: parseFloat(discountVal) || 0, status: paymentStatus }),
+        body: JSON.stringify({ discount: parseFloat(discountVal) || 0, status: paymentStatus, paidAmount: parseFloat(paidAmountVal) || 0 }),
       });
       const data = await res.json();
       if (res.ok) { setSuccess("Invoice updated successfully."); fetchBills(); setTimeout(() => setIsEditDialogOpen(false), 900); }
@@ -114,7 +116,7 @@ export default function BillingPage() {
         <div>
           <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Finance</p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">Billing & Invoices</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track invoices, record payments, and manage adjustments.</p>
+          <p className="text-sm text-muted-foreground mt-1">Track invoices, record payments, and manage billing.</p>
         </div>
       </div>
 
@@ -142,7 +144,7 @@ export default function BillingPage() {
             <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-muted text-muted-foreground"><Receipt className="h-[18px] w-[18px]" /></span>
           </div>
           <h2 className="font-display text-3xl font-semibold text-foreground mt-3 tnum">{bills.length}</h2>
-          <p className="flex items-center gap-1.5 mt-2 text-primary font-medium text-xs"><TrendingUp className="h-3.5 w-3.5" /> Clinical invoice registry</p>
+          <p className="flex items-center gap-1.5 mt-2 text-primary font-medium text-xs"><TrendingUp className="h-3.5 w-3.5" /> All generated bills</p>
         </div>
       </div>
 
@@ -173,14 +175,14 @@ export default function BillingPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-muted/30 border-b border-border/60">
-                  {["Bill ID", "Patient", "Date", "Subtotal", "Discount", "Total", "Status", ""].map((h, i) => (
+                  {["Bill ID", "Patient", "Date", "Total", "Paid", "Balance", "Status", ""].map((h, i) => (
                     <th key={h + i} className={`px-6 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground whitespace-nowrap ${i === 2 ? "hidden lg:table-cell" : ""} ${i === 3 || i === 4 ? "hidden md:table-cell text-right" : ""} ${i === 5 ? "text-right" : ""} ${i === 7 ? "text-right" : ""}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {currentRows.map((bill) => {
-                  const subtotal = bill.total + bill.discount;
+                  const balance = bill.total - bill.paidAmount;
                   return (
                     <tr key={bill.id} className="border-b border-border/30 last:border-0 hover:bg-muted/25 transition-colors">
                       <td className="px-6 py-4 font-mono text-xs font-semibold text-primary">{bill.customId}</td>
@@ -189,9 +191,17 @@ export default function BillingPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">{bill.patient.customId}</p>
                       </td>
                       <td className="px-6 py-4 text-muted-foreground text-xs hidden lg:table-cell whitespace-nowrap">{new Date(bill.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
-                      <td className="px-6 py-4 text-right font-mono text-xs text-muted-foreground hidden md:table-cell">₹{subtotal.toFixed(2)}</td>
-                      <td className="px-6 py-4 text-right font-mono text-xs text-destructive hidden md:table-cell">{bill.discount > 0 ? `-₹${bill.discount.toFixed(2)}` : "—"}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm font-bold text-foreground">₹{bill.total.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right font-mono text-xs text-foreground hidden md:table-cell">₹{bill.total.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right font-mono text-xs text-primary hidden md:table-cell">₹{bill.paidAmount.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right font-mono text-sm font-bold">
+                        {balance > 0 ? (
+                           <span className="text-destructive">₹{balance.toFixed(2)}</span>
+                        ) : balance < 0 ? (
+                           <span className="text-green-600 dark:text-green-500">₹{Math.abs(balance).toFixed(2)} Extra</span>
+                        ) : (
+                           <span className="text-muted-foreground">₹0.00</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusPill(bill.status)}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${statusDot(bill.status)}`} />{bill.status}
@@ -261,20 +271,29 @@ export default function BillingPage() {
 
             <div className="bg-muted/40 border border-border/60 rounded-lg p-4 space-y-2 text-xs">
               <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-semibold text-foreground tnum">₹{editingBill && (editingBill.total + editingBill.discount).toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Current Total</span><span className="font-bold text-foreground tnum">₹{editingBill?.total.toFixed(2)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Current Total</span><span className="font-bold text-foreground tnum">₹{editingBill && Math.max(0, editingBill.total + editingBill.discount - (parseFloat(discountVal)||0)).toFixed(2)}</span></div>
             </div>
 
             <div className="space-y-1.5"><Label>Apply Discount (₹)</Label><Input type="number" value={discountVal} onChange={(e) => setDiscountVal(e.target.value)} disabled={saving} required /></div>
+            
             <div className="space-y-1.5">
-              <Label>Payment Status</Label>
-              <Select value={paymentStatus} onValueChange={setPaymentStatus} disabled={saving}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PAID">Paid in Full</SelectItem>
-                  <SelectItem value="PARTIAL">Partial Payment</SelectItem>
-                  <SelectItem value="UNPAID">Unpaid Balance</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Total Paid Amount (₹)</Label>
+              <Input type="number" value={paidAmountVal} onChange={(e) => setPaidAmountVal(e.target.value)} disabled={saving} required />
+              <div className="flex justify-between text-xs mt-2 text-muted-foreground bg-muted/40 p-2.5 rounded-lg border border-border/60 shadow-sm">
+                <span>Remaining Balance:</span>
+                {(() => {
+                  const finalTotal = editingBill ? Math.max(0, editingBill.total + editingBill.discount - (parseFloat(discountVal)||0)) : 0;
+                  const finalPaid = parseFloat(paidAmountVal)||0;
+                  const balance = finalTotal - finalPaid;
+                  if (balance > 0) {
+                     return <span className="font-semibold text-destructive tnum">₹{balance.toFixed(2)}</span>;
+                  } else if (balance < 0) {
+                     return <span className="font-semibold text-green-600 dark:text-green-500 tnum">₹{Math.abs(balance).toFixed(2)} Extra</span>;
+                  } else {
+                     return <span className="font-semibold text-muted-foreground tnum">₹0.00</span>;
+                  }
+                })()}
+              </div>
             </div>
 
             <div className="flex justify-end gap-2.5 pt-2">

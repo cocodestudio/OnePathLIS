@@ -109,11 +109,11 @@ export default function DashboardOverviewPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Dashboard</p>
+          <p className="text-[11px] font-semibold text-primary uppercase tracking-[0.2em] mb-1.5">Overview</p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-            Good day, {session?.user?.name?.split(" ")[0] || "Doctor"}
+            Welcome back, {session?.user?.name?.split(" ")[0] || "Doctor"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Here is your laboratory summary for today.</p>
+          <p className="text-sm text-muted-foreground mt-1">Here's what's happening today.</p>
         </div>
         <div className="flex gap-2.5">
           <button onClick={loadDashboardData}
@@ -141,8 +141,8 @@ export default function DashboardOverviewPage() {
         <div className="col-span-12 lg:col-span-8 bg-card border border-border/70 rounded-xl p-6 shadow-card">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="font-display text-lg font-semibold text-foreground">Patient Volume</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Last 7 days of intake</p>
+              <h3 className="font-display text-lg font-semibold text-foreground">Patients Overview</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Last 7 days</p>
             </div>
             <span className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-muted/60 text-muted-foreground border border-border/60">Weekly</span>
           </div>
@@ -170,12 +170,12 @@ export default function DashboardOverviewPage() {
         </div>
 
         <div className="col-span-12 lg:col-span-4 bg-card border border-border/70 rounded-xl p-6 shadow-card">
-          <h3 className="font-display text-lg font-semibold text-foreground mb-5">Quick Actions</h3>
+          <h3 className="font-display text-lg font-semibold text-foreground mb-5">Shortcuts</h3>
           <div className="space-y-2.5">
             {[
-              { href: "/dashboard/patients/register", icon: UserPlus, label: "Register Patient", sub: "Fast-track intake", tone: "bg-accent text-primary" },
-              { href: "/dashboard/reports", icon: FileSpreadsheet, label: "Enter Results", sub: "Pending test values", tone: "bg-gold/12 text-gold" },
-              { href: "/dashboard/reports", icon: Printer, label: "Print Reports", sub: "Batch utility", tone: "bg-muted text-muted-foreground" },
+              { href: "/dashboard/patients/register", icon: UserPlus, label: "Add Patient", sub: "Register a new patient", tone: "bg-accent text-primary" },
+              { href: "/dashboard/reports", icon: FileSpreadsheet, label: "Add Results", sub: "Enter pending test values", tone: "bg-gold/12 text-gold" },
+              { href: "/dashboard/reports", icon: Printer, label: "Print Reports", sub: "View and print completed reports", tone: "bg-muted text-muted-foreground" },
             ].map(({ href, icon: Icon, label, sub, tone }) => (
               <Link key={label} href={href}
                 className="flex items-center gap-3.5 p-3.5 rounded-lg border border-border/60 hover:border-primary/40 hover:bg-accent/40 transition-all group">
@@ -197,7 +197,7 @@ export default function DashboardOverviewPage() {
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-8 bg-card border border-border/70 rounded-xl shadow-card overflow-hidden">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
-            <h3 className="font-display text-lg font-semibold text-foreground">Recent Intake</h3>
+            <h3 className="font-display text-lg font-semibold text-foreground">Recent Patients</h3>
             <Link href="/dashboard/reports" className="text-[11px] font-semibold text-primary hover:text-secondary flex items-center gap-1 transition-colors">
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>

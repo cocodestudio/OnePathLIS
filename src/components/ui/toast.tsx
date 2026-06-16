@@ -50,7 +50,7 @@ function ToastCard({ title, description, variant, onClose }: ToastItem & { onClo
 
   return (
     <div
-      className={`pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-xl border border-border/70 bg-card/95 backdrop-blur-md p-3.5 pr-9 shadow-overlay transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      className={`pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-xl border border-border/70 bg-card/95 backdrop-blur-md p-3.5 pr-9 shadow-overlay transition-all duration-300 ease-out ${
         shown ? "translate-x-0 opacity-100" : "translate-x-[120%] opacity-0"
       }`}
     >

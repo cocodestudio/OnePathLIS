@@ -26,7 +26,11 @@ export async function GET(
           include: {
             test: {
               include: {
-                parent: true
+                parent: {
+                  include: {
+                    parent: true
+                  }
+                }
               }
             },
           },
@@ -55,7 +59,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { results } = body; // Array of { id: string, resultValue: string }
+    const { results, printedInterpretations } = body;
 
     if (!results || !Array.isArray(results)) {
       return NextResponse.json({ error: "Results array is required." }, { status: 400 });
@@ -109,7 +113,9 @@ export async function PUT(
               }
             }
             
-            isAbnormal = valNum < minRange || valNum > maxRange;
+            if (minRange !== null && maxRange !== null) {
+              isAbnormal = valNum < minRange || valNum > maxRange;
+            }
           }
         }
 
@@ -128,6 +134,7 @@ export async function PUT(
       where: { id: params.id },
       data: {
         status: "COMPLETED",
+        printedInterpretations: printedInterpretations !== undefined ? JSON.stringify(printedInterpretations) : undefined,
       },
       include: {
         patient: true,
@@ -136,7 +143,11 @@ export async function PUT(
           include: {
             test: {
               include: {
-                parent: true
+                parent: {
+                  include: {
+                    parent: true
+                  }
+                }
               }
             },
           },

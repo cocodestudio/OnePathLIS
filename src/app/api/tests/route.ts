@@ -16,7 +16,11 @@ export async function GET() {
         parentId: null // Only fetch root tests by default
       },
       include: {
-        subTests: true // Include subtests
+        subTests: {
+          include: {
+            subTests: true
+          }
+        }
       },
       orderBy: [
         { category: "asc" },
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, category, type, price, unit, genderRefType, refRangeMin, refRangeMax, refRangeMinMale, refRangeMaxMale, refRangeMinFemale, refRangeMaxFemale, subTests } = body;
+    const { name, category, type, price, unit, genderRefType, refRangeMin, refRangeMax, refRangeMinMale, refRangeMaxMale, refRangeMinFemale, refRangeMaxFemale, subTests, fieldType, interpretation } = body;
 
     if (!name || !category) {
       return NextResponse.json({ error: "Please provide all required test parameters." }, { status: 400 });
@@ -61,6 +65,8 @@ export async function POST(request: Request) {
         labId: session.user.labId,
         name,
         category,
+        fieldType: fieldType || "Single Field",
+        interpretation: interpretation || null,
         type: type || "Pathology",
         price: price !== undefined ? parseFloat(price) : 0,
         unit,
@@ -77,6 +83,8 @@ export async function POST(request: Request) {
             labId: session.user.labId,
             name: sub.name,
             category,
+            fieldType: sub.fieldType || "Single Field",
+            interpretation: sub.interpretation || null,
             type: type || "Pathology",
             price: 0,
             unit: sub.unit,
@@ -87,11 +95,33 @@ export async function POST(request: Request) {
             refRangeMaxMale: sub.refRangeMaxMale !== undefined && sub.refRangeMaxMale !== "" ? parseFloat(sub.refRangeMaxMale) : null,
             refRangeMinFemale: sub.refRangeMinFemale !== undefined && sub.refRangeMinFemale !== "" ? parseFloat(sub.refRangeMinFemale) : null,
             refRangeMaxFemale: sub.refRangeMaxFemale !== undefined && sub.refRangeMaxFemale !== "" ? parseFloat(sub.refRangeMaxFemale) : null,
+            subTests: sub.subTests && sub.subTests.length > 0 ? {
+              create: sub.subTests.map((subsub: any) => ({
+                id: `${testId}-${sub.name}-${subsub.name}`.replace(/\s+/g, "_"),
+                labId: session.user.labId,
+                name: subsub.name,
+                category,
+                type: type || "Pathology",
+                price: 0,
+                unit: subsub.unit,
+                genderRefType: subsub.genderRefType || "BOTH",
+                refRangeMin: subsub.refRangeMin ? parseFloat(subsub.refRangeMin) : null,
+                refRangeMax: subsub.refRangeMax ? parseFloat(subsub.refRangeMax) : null,
+                refRangeMinMale: subsub.refRangeMinMale !== undefined && subsub.refRangeMinMale !== "" ? parseFloat(subsub.refRangeMinMale) : null,
+                refRangeMaxMale: subsub.refRangeMaxMale !== undefined && subsub.refRangeMaxMale !== "" ? parseFloat(subsub.refRangeMaxMale) : null,
+                refRangeMinFemale: subsub.refRangeMinFemale !== undefined && subsub.refRangeMinFemale !== "" ? parseFloat(subsub.refRangeMinFemale) : null,
+                refRangeMaxFemale: subsub.refRangeMaxFemale !== undefined && subsub.refRangeMaxFemale !== "" ? parseFloat(subsub.refRangeMaxFemale) : null,
+              }))
+            } : undefined
           }))
         } : undefined
       },
       include: {
-        subTests: true
+        subTests: {
+          include: {
+            subTests: true
+          }
+        }
       }
     });
 

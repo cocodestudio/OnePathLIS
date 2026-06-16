@@ -17,7 +17,11 @@ export async function GET() {
         bill: true,
         results: {
           include: {
-            test: true,
+            test: {
+              include: {
+                parent: true,
+              }
+            },
           },
         },
       },
@@ -51,6 +55,13 @@ export async function POST(request: Request) {
       where: {
         id: { in: testIds },
         labId: session.user.labId,
+      },
+      include: {
+        subTests: {
+          include: {
+            subTests: true
+          }
+        }
       }
     });
 
@@ -124,23 +135,37 @@ export async function POST(request: Request) {
       
       for (const t of tests) {
         if (t.subTests && t.subTests.length > 0) {
-          for (const sub of t.subTests) {
-            // check if subtest is already added (e.g. if user selected both parent and subtest somehow)
-            if (!reportTestsData.find(rt => rt.testId === sub.id)) {
-              reportTestsData.push({
-                reportId: report.id,
-                testId: sub.id,
-                resultValue: null,
-                isAbnormal: false,
-              });
+          for (const param of t.subTests) {
+            if (param.fieldType === "Multiple Field" && param.subTests && param.subTests.length > 0) {
+              for (const subParam of param.subTests) {
+                if (!reportTestsData.find(rt => rt.testId === subParam.id)) {
+                  reportTestsData.push({
+                    reportId: report.id,
+                    testId: subParam.id,
+                    resultValue: null,
+                    isAbnormal: false,
+                  });
+                }
+              }
+            } else {
+              // Single field parameter
+              if (!reportTestsData.find(rt => rt.testId === param.id)) {
+                reportTestsData.push({
+                  reportId: report.id,
+                  testId: param.id,
+                  resultValue: param.fieldType === "Custom Editor" ? param.interpretation : null,
+                  isAbnormal: false,
+                });
+              }
             }
           }
         } else {
+          // No parameters inside main test, just add the test itself
           if (!reportTestsData.find(rt => rt.testId === t.id)) {
             reportTestsData.push({
               reportId: report.id,
               testId: t.id,
-              resultValue: null,
+              resultValue: t.fieldType === "Custom Editor" ? t.interpretation : null,
               isAbnormal: false,
             });
           }

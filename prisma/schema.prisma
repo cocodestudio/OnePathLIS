@@ -70,6 +70,7 @@ model Bill {
   patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   total      Float
   discount   Float    @default(0.0)
+  paidAmount Float    @default(0.0)
   status     String   @default("UNPAID") // PAID, UNPAID, PARTIAL
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -87,8 +88,9 @@ model Report {
   patient    Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
   status     String       @default("PENDING") // PENDING, COMPLETED
   createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  results    ReportTest[]
+  updatedAt              DateTime     @updatedAt
+  results                ReportTest[]
+  printedInterpretations String?      // JSON array of test names/IDs that should print their interpretation
 }
 
 model Test {
@@ -100,6 +102,7 @@ model Test {
   subTests    Test[]       @relation("TestHierarchy")
   name              String
   category          String       // CBC, LFT, KFT, Thyroid, etc.
+  fieldType         String       @default("Single Field") // "Single Field", "Multiple Field"
   type              String       @default("Pathology")
   price             Float        @default(0)
   unit              String?
@@ -110,9 +113,10 @@ model Test {
   refRangeMaxMale   Float?
   refRangeMinFemale Float?
   refRangeMaxFemale Float?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  reportTests ReportTest[]
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  interpretation    String?      // Rich text HTML interpretation for the test
+  reportTests       ReportTest[]
 }
 
 model ReportTest {
