@@ -15,7 +15,7 @@ import {
   Filter, X, Eye, Plus, Loader2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { PrintPreviewDialog } from "@/components/print-preview-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface Test { 
@@ -42,33 +42,17 @@ export default function ReportsListPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [abnormalOnly, setAbnormalOnly] = useState(false);
+  const [filterDate, setFilterDate] = useState(() => new Date().toISOString().split("T")[0]);
+
+  const [printReport, setPrintReport] = useState<any | null>(null);
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  const printRef = useRef<HTMLDivElement>(null);
-  const [printReport, setPrintReport] = useState<ReportSheetData | null>(null);
-  const [printSettings, setPrintSettings] = useState<{ bgImage: string | null; headerHeight: number; footerHeight: number; marginLeft: number; marginRight: number } | undefined>(undefined);
-  const [printingId, setPrintingId] = useState<string | null>(null);
-
-  const [showPrintOptions, setShowPrintOptions] = useState(false);
-  const [useCustomLetterpad, setUseCustomLetterpad] = useState(true);
-  const [pendingPrintData, setPendingPrintData] = useState<{ report: ReportSheetData; settings: any } | null>(null);
-
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: printReport ? `Report_${printReport.patient.name.replace(/\s+/g, "_")}` : "Medical_Report",
-    onAfterPrint: () => setPrintReport(null),
-  });
-
   useEffect(() => { fetchReports(); }, []);
-
-  useEffect(() => {
-    if (printReport) {
-      const t = setTimeout(() => handlePrint(), 60);
-      return () => clearTimeout(t);
-    }
-  }, [printReport, handlePrint]);
 
   const fetchReports = async () => {
     try {
@@ -88,23 +72,8 @@ export default function ReportsListPage() {
       const res = await fetch(`/api/reports/${id}`);
       if (res.ok) {
         const data = await res.json();
-        const hasBg = !!(data.lab && data.lab.printBgImage);
-        const fetchedSettings = {
-          bgImage: data.lab?.printBgImage || null,
-          headerHeight: data.lab?.printHeaderHeight ?? 40,
-          footerHeight: data.lab?.printFooterHeight ?? 40,
-          marginLeft: data.lab?.printMarginLeft ?? 40,
-          marginRight: data.lab?.printMarginRight ?? 40,
-        };
-
-        if (hasBg) {
-          setPendingPrintData({ report: { ...data, lab: data.lab || DEFAULT_LAB }, settings: fetchedSettings });
-          setUseCustomLetterpad(true);
-          setShowPrintOptions(true);
-        } else {
-          setPrintSettings(fetchedSettings);
-          setPrintReport({ ...data, lab: data.lab || DEFAULT_LAB });
-        }
+        setPrintReport({ ...data, lab: data.lab || DEFAULT_LAB });
+        setShowPrintOptions(true);
       } else {
         toastError("Could not load report", "Failed to fetch report data for printing.");
       }
@@ -113,17 +82,6 @@ export default function ReportsListPage() {
     } finally {
       setPrintingId(null);
     }
-  };
-
-  const handleConfirmPrint = () => {
-    if (!pendingPrintData) return;
-    setPrintSettings({
-      ...pendingPrintData.settings,
-      bgImage: useCustomLetterpad ? pendingPrintData.settings.bgImage : null,
-    });
-    setPrintReport(pendingPrintData.report);
-    setShowPrintOptions(false);
-    setPendingPrintData(null);
   };
 
   const categories = Array.from(new Set(reports.flatMap((r) => r.results.map((res) => res.test.category)))).filter(Boolean);
@@ -136,7 +94,8 @@ export default function ReportsListPage() {
     const matchesStatus = statusFilter === "ALL" || r.status === statusFilter;
     const matchesCategory = categoryFilter === "ALL" || r.results.some((res) => res.test.category === categoryFilter);
     const matchesAbnormal = !abnormalOnly || r.results.some((res) => res.isAbnormal);
-    return matchesSearch && matchesStatus && matchesCategory && matchesAbnormal;
+    const matchesDate = filterDate ? r.createdAt.startsWith(filterDate) : true;
+    return matchesSearch && matchesStatus && matchesCategory && matchesAbnormal && matchesDate;
   });
 
   const totalRows = filteredReports.length;
@@ -145,10 +104,10 @@ export default function ReportsListPage() {
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = filteredReports.slice(indexOfFirstRow, indexOfLastRow);
 
-  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, categoryFilter, abnormalOnly]);
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, categoryFilter, abnormalOnly, filterDate]);
 
-  const clearFilters = () => { setSearch(""); setStatusFilter("ALL"); setCategoryFilter("ALL"); setAbnormalOnly(false); };
-  const hasFilters = search || statusFilter !== "ALL" || categoryFilter !== "ALL" || abnormalOnly;
+  const clearFilters = () => { setSearch(""); setStatusFilter("ALL"); setCategoryFilter("ALL"); setAbnormalOnly(false); setFilterDate(""); };
+  const hasFilters = search || statusFilter !== "ALL" || categoryFilter !== "ALL" || abnormalOnly || filterDate;
 
   const selectClass = "w-full h-10 bg-background border border-border rounded-lg px-3 text-sm focus:border-primary/60 focus:ring-2 focus:ring-primary/20 outline-none transition-all";
 
@@ -168,30 +127,31 @@ export default function ReportsListPage() {
 
       {/* Filters */}
       <div className="bg-card border border-border/70 rounded-xl p-5 shadow-card">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-          <div className="space-y-1.5">
+        <div className="flex flex-col sm:flex-row flex-wrap items-end gap-4">
+          <div className="space-y-1.5 flex-1 min-w-[200px]">
             <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Search</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
               <Input placeholder="Patient, ID, report…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="ALL">All statuses</SelectItem><SelectItem value="PENDING">Pending</SelectItem><SelectItem value="COMPLETED">Completed</SelectItem></SelectContent>
-            </Select>
+          
+          <div className="space-y-1.5 w-full sm:w-auto">
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Date</label>
+            <div className="flex items-center gap-2">
+              <Input 
+                type="date" 
+                className="w-full sm:w-[150px]"
+                value={filterDate} 
+                onChange={(e) => setFilterDate(e.target.value)} 
+              />
+
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Department</label>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="ALL">All departments</SelectItem>{categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={() => setAbnormalOnly(!abnormalOnly)} variant={abnormalOnly ? "destructive" : "outline"} className="h-10 flex-1">
+
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button onClick={() => setAbnormalOnly(!abnormalOnly)} variant={abnormalOnly ? "destructive" : "outline"} className="h-10 flex-1 sm:flex-none">
               <AlertTriangle className="h-4 w-4" /> Abnormal
             </Button>
             {hasFilters && (
@@ -269,8 +229,8 @@ export default function ReportsListPage() {
                             </Link>
                           ) : (
                             <>
-                              <Link href={`/dashboard/reports/${rep.id}`}>
-                                <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="View report"><Eye className="h-3.5 w-3.5" /></Button>
+                              <Link href={`/dashboard/reports/${rep.id}/edit`}>
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0" title="Edit report"><Edit3 className="h-3.5 w-3.5" /></Button>
                               </Link>
                               <Button variant="outline" size="sm" className="h-8" onClick={() => triggerPrint(rep.id)} disabled={printingId === rep.id} title="Print report">
                                 {printingId === rep.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />} Print
@@ -316,38 +276,11 @@ export default function ReportsListPage() {
         )}
       </div>
 
-      {/* Hidden printable sheet (off-screen) */}
-      {printReport && (
-        <div className="fixed -left-[10000px] top-0" aria-hidden>
-          <ReportSheet ref={printRef} report={printReport} settings={printSettings} />
-        </div>
-      )}
-
-      {/* Print Options Dialog */}
-      <Dialog open={showPrintOptions} onOpenChange={setShowPrintOptions}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Print Options</DialogTitle>
-            <DialogDescription>Choose how you want to print this report.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-              <Checkbox 
-                checked={useCustomLetterpad} 
-                onCheckedChange={(checked) => setUseCustomLetterpad(checked as boolean)} 
-              />
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium text-foreground">Print with custom letterpad</p>
-                <p className="text-xs text-muted-foreground">Uses the lab's configured background image.</p>
-              </div>
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPrintOptions(false)}>Cancel</Button>
-            <Button onClick={handleConfirmPrint}><Printer className="h-4 w-4 mr-2" /> Continue Print</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PrintPreviewDialog 
+        open={showPrintOptions} 
+        onOpenChange={setShowPrintOptions} 
+        report={printReport} 
+      />
     </div>
   );
 }

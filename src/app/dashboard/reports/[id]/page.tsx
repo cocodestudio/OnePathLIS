@@ -8,9 +8,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ReportSheet, type ReportSheetData, type PrintSettings } from "@/components/report-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Printer, ArrowLeft, Edit, AlertCircle } from "lucide-react";
+import { ArrowLeft, Edit, AlertCircle, Printer } from "lucide-react";
+import { PrintPreviewDialog } from "@/components/print-preview-dialog";
 
 const defaultPrintSettings: PrintSettings = {
   bgImage: null, headerHeight: 40, footerHeight: 40, marginLeft: 40, marginRight: 40
@@ -26,39 +25,26 @@ export default function ReportDetailPage() {
 
   const [printSettings, setPrintSettings] = useState<PrintSettings>(defaultPrintSettings);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
-  const [useCustomLetterpad, setUseCustomLetterpad] = useState(true);
-
-  const handlePrint = useReactToPrint({
-    contentRef: reportRef,
-    documentTitle: report ? `Report_${report.patient.name.replace(/\s+/g, "_")}` : "Medical_Report",
-  });
 
   useEffect(() => { 
     if (reportId) fetchReport(); 
+    
+    // Also fetch on window focus to ensure fresh data after editing
+    const handleFocus = () => {
+      if (reportId) fetchReport();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [reportId]);
 
   const triggerPrint = () => {
-    if (report?.lab?.printBgImage) {
-      setUseCustomLetterpad(true);
-      setShowPrintOptions(true);
-    } else {
-      handlePrint();
-    }
-  };
-
-  const handleConfirmPrint = () => {
-    setShowPrintOptions(false);
-    const bgImage = useCustomLetterpad ? (report?.lab?.printBgImage || null) : null;
-    setPrintSettings(prev => ({ ...prev, bgImage }));
-    setTimeout(() => {
-      handlePrint();
-    }, 100);
+    setShowPrintOptions(true);
   };
 
   const fetchReport = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/reports/${reportId}`);
+      const res = await fetch(`/api/reports/${reportId}?t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setReport({
@@ -121,35 +107,15 @@ export default function ReportDetailPage() {
       </div>
 
       {/* A4 sheet */}
-      <div className="bg-white border border-border/70 rounded-xl shadow-card p-2 overflow-x-auto">
-        <ReportSheet ref={reportRef} report={report} settings={printSettings} />
+      <div className="bg-white border border-border/70 rounded-xl shadow-card p-2 overflow-x-auto flex justify-center">
+        {report && <ReportSheet ref={reportRef} report={report} settings={printSettings} />}
       </div>
 
-      {/* Print Options Dialog */}
-      <Dialog open={showPrintOptions} onOpenChange={setShowPrintOptions}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Print Options</DialogTitle>
-            <DialogDescription>Choose how you want to print this report.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <label className="flex items-center gap-3 p-3 border border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-              <Checkbox 
-                checked={useCustomLetterpad} 
-                onCheckedChange={(checked) => setUseCustomLetterpad(checked as boolean)} 
-              />
-              <div className="space-y-0.5">
-                <p className="text-sm font-medium text-foreground">Print with custom letterpad</p>
-                <p className="text-xs text-muted-foreground">Uses the lab's configured background image.</p>
-              </div>
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPrintOptions(false)}>Cancel</Button>
-            <Button onClick={handleConfirmPrint}><Printer className="h-4 w-4 mr-2" /> Continue Print</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PrintPreviewDialog 
+        open={showPrintOptions} 
+        onOpenChange={setShowPrintOptions} 
+        report={report} 
+      />
     </div>
   );
 }

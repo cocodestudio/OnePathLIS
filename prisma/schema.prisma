@@ -113,6 +113,8 @@ model Test {
   refRangeMaxMale   Float?
   refRangeMinFemale Float?
   refRangeMaxFemale Float?
+  valueType         String       @default("Numeric") // "Numeric", "Custom"
+  customOptions     String?      // JSON array of strings
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   interpretation    String?      // Rich text HTML interpretation for the test

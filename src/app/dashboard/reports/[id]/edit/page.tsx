@@ -24,6 +24,7 @@ interface Test {
   genderRefType?: string; refRangeMin: number; refRangeMax: number; 
   refRangeMinMale?: number | null; refRangeMaxMale?: number | null; 
   refRangeMinFemale?: number | null; refRangeMaxFemale?: number | null;
+  valueType?: string; customOptions?: string | null;
   subTests?: Test[];
   parent?: { id: string; name: string; interpretation?: string; parent?: { id: string; name: string; interpretation?: string } }; 
 }
@@ -53,7 +54,6 @@ export default function ResultEntryPage() {
   const [printedInterpretations, setPrintedInterpretations] = useState<string[]>([]);
   const [availableTests, setAvailableTests] = useState<Test[]>([]);
   const [modifyingTest, setModifyingTest] = useState(false);
-  const [customEditorActiveItemId, setCustomEditorActiveItemId] = useState<string | null>(null);
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [testSearch, setTestSearch] = useState("");
   const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({});
@@ -144,6 +144,7 @@ export default function ResultEntryPage() {
   };
 
   const isValueAbnormal = (test: Test, currentVal: string) => {
+    if (test.valueType === "Custom") return { abnormal: false, flag: "NORMAL" };
     if (!currentVal || currentVal.trim() === "") return { abnormal: false, flag: "NORMAL" };
     const num = parseFloat(currentVal);
     if (isNaN(num)) return { abnormal: false, flag: "NORMAL" };
@@ -337,10 +338,6 @@ export default function ResultEntryPage() {
             </div>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="flex flex-col bg-muted/40 border border-border/60 px-3 py-1.5 rounded-lg flex-1 md:flex-none">
-              <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider leading-none">Specimen</span>
-              <span className="font-mono text-xs font-bold text-foreground mt-1">{report.customId}</span>
-            </div>
             <Button onClick={handleSaveResults} disabled={saving} className="h-11">
               {saving ? (<><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>) : (<><CheckCircle2 className="h-4 w-4" /> Save Results</>)}
             </Button>
@@ -372,6 +369,9 @@ export default function ResultEntryPage() {
               const hasInterpretation = !!mainTestObj.interpretation && mainTestObj.interpretation.trim() !== '' && mainTestObj.interpretation !== '<p><br></p>';
               const mainTestId = mainTestObj.id;
               
+              const allCustomEditor = Object.values(paramsObj).flat().every(item => item.test.fieldType === "Custom Editor");
+              const hasAnyNumeric = Object.values(paramsObj).flat().some(item => item.test.fieldType !== "Custom Editor" && item.test.valueType !== "Custom");
+              
               return (
               <div key={mainTestName} className="bg-card border border-border/70 rounded-xl shadow-card overflow-hidden">
                 <div className="bg-muted/30 px-6 py-3.5 border-b border-border/60 flex items-center justify-between">
@@ -397,11 +397,15 @@ export default function ResultEntryPage() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    {!Object.values(paramsObj).flat().every(item => item.test.fieldType === "Custom Editor") && (
+                    {!allCustomEditor && (
                       <thead>
                         <tr className="bg-muted/15 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground border-b border-border/60">
                           <th className="px-6 py-3 w-2/5">Parameter</th><th className="px-6 py-3">Value</th>
-                          <th className="px-6 py-3">Unit</th><th className="px-6 py-3">Reference</th><th className="px-6 py-3 text-right">Flag</th>
+                          {hasAnyNumeric && (
+                            <>
+                              <th className="px-6 py-3">Unit</th><th className="px-6 py-3">Reference</th><th className="px-6 py-3 text-right">Flag</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                     )}
@@ -410,7 +414,7 @@ export default function ResultEntryPage() {
                         <React.Fragment key={paramName}>
                           {paramName !== "_default" && paramName !== "Report Template" && (
                             <tr className="bg-muted/5 border-b border-border/30">
-                              <td colSpan={5} className="px-6 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-zinc-50">{paramName}</td>
+                              <td colSpan={hasAnyNumeric ? 5 : 2} className="px-6 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-zinc-50">{paramName}</td>
                             </tr>
                           )}
                           {items.map((item) => {
@@ -421,34 +425,22 @@ export default function ResultEntryPage() {
                             if (isCustomEditor) {
                               return (
                                 <tr key={item.id} className="border-b border-border/30 last:border-0 hover:bg-muted/15 transition-colors">
-                                  <td colSpan={5} className="px-6 py-4">
+                                  <td colSpan={hasAnyNumeric ? 5 : 2} className="px-6 py-4">
                                     <div className="mb-2 flex items-center justify-between">
                                       <span className="text-sm font-semibold text-foreground">
                                         {item.test.name !== "Report Template" ? item.test.name : ""}
                                       </span>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded uppercase tracking-wider">Custom Layout</span>
-                                        <Button 
-                                          type="button" 
-                                          variant="outline" 
-                                          size="sm" 
-                                          onClick={() => setCustomEditorActiveItemId(item.id)}
-                                          className="h-7 text-[10px] px-3 font-semibold border-primary/20 text-primary hover:bg-primary/5"
-                                        >
-                                          <FileText className="h-3 w-3 mr-1.5" />
-                                          Open Editor
-                                        </Button>
                                       </div>
                                     </div>
-                                    <div 
-                                      className="min-h-[100px] max-h-[150px] overflow-hidden border border-border/60 rounded-md bg-card/50 p-3 text-xs text-muted-foreground relative"
-                                    >
-                                      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-card/90 pointer-events-none" />
-                                      {val ? (
-                                        <div dangerouslySetInnerHTML={{ __html: val }} className="opacity-70 scale-90 origin-top-left" />
-                                      ) : (
-                                        <div className="flex items-center justify-center h-full text-muted-foreground/50 italic pt-6">No result entered yet</div>
-                                      )}
+                                    <div className="mt-3 border border-border/60 rounded-xl overflow-hidden shadow-sm">
+                                      <TipTapEditor 
+                                        value={val} 
+                                        onChange={(html) => handleValueChange(item.id, html)}
+                                        hideHeader
+                                        hideFooter
+                                      />
                                     </div>
                                   </td>
                                 </tr>
@@ -460,26 +452,49 @@ export default function ResultEntryPage() {
                                 <td className="px-6 py-3.5">
                                   <span className={`text-sm ${paramName !== "_default" ? "pl-4" : ""} font-semibold ${abnormal ? "text-destructive" : "text-foreground"}`}>{item.test.name}</span>
                                 </td>
-                                <td className="px-6 py-3.5">
-                                  <Input placeholder="—" value={val} onChange={(e) => handleValueChange(item.id, e.target.value)} disabled={saving}
-                                    className={`w-28 h-9 font-mono text-sm ${abnormal ? "text-destructive border-destructive/50 bg-destructive/8 font-bold focus:ring-destructive/20 focus:border-destructive" : ""}`} />
-                                </td>
-                                <td className="px-6 py-3.5 text-xs font-mono text-muted-foreground">{item.test.unit}</td>
-                                <td className="px-6 py-3.5 text-xs font-mono text-muted-foreground font-semibold">
-                                  {(() => {
-                                    const range = getRefRange(item.test, report?.patient.gender || "Male");
-                                    return `${range.min} – ${range.max}`;
-                                  })()}
-                                </td>
-                                <td className="px-6 py-3.5 text-right">
-                                  {abnormal ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-destructive text-destructive-foreground">{flag}</span>
-                                  ) : val ? (
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">NORMAL</span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground/45 italic">Pending</span>
-                                  )}
-                                </td>
+                                {item.test.valueType === "Custom" ? (
+                                  <td className="px-6 py-3.5" colSpan={hasAnyNumeric ? 4 : 1}>
+                                    <div className="max-w-md">
+                                      <Input 
+                                        list={`options-${item.id}`} 
+                                        placeholder="Select or enter result..." 
+                                        value={val} 
+                                        onChange={(e) => handleValueChange(item.id, e.target.value)} 
+                                        disabled={saving}
+                                        className={`w-full h-9 font-medium text-sm ${abnormal ? "text-destructive border-destructive/50 bg-destructive/8 font-bold focus:ring-destructive/20 focus:border-destructive" : ""}`} 
+                                      />
+                                      {item.test.customOptions && (
+                                        <datalist id={`options-${item.id}`}>
+                                          {JSON.parse(item.test.customOptions).map((opt: string, i: number) => (
+                                            <option key={i} value={opt} />
+                                          ))}
+                                        </datalist>
+                                      )}
+                                    </div>
+                                  </td>
+                                ) : (
+                                  <>
+                                    <td className="px-6 py-3.5">
+                                      <Input placeholder="—" value={val} onChange={(e) => handleValueChange(item.id, e.target.value)} disabled={saving}
+                                        className={`w-28 h-9 font-mono text-sm ${abnormal ? "text-destructive border-destructive/50 bg-destructive/8 font-bold focus:ring-destructive/20 focus:border-destructive" : ""}`} />
+                                    </td>
+                                    <td className="px-6 py-3.5 text-xs font-mono text-muted-foreground">{item.test.unit}</td>
+                                    <td className="px-6 py-3.5 text-xs font-mono text-muted-foreground">
+                                      {item.test.genderRefType === "GENDER_SPECIFIC" ? 
+                                        (report?.patient.gender.toLowerCase() === "female" ? `${item.test.refRangeMinFemale ?? item.test.refRangeMin} – ${item.test.refRangeMaxFemale ?? item.test.refRangeMax}` : `${item.test.refRangeMinMale ?? item.test.refRangeMin} – ${item.test.refRangeMaxMale ?? item.test.refRangeMax}`)
+                                        : `${item.test.refRangeMin} – ${item.test.refRangeMax}`}
+                                    </td>
+                                    <td className="px-6 py-3.5 text-right">
+                                      {abnormal ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-destructive text-destructive-foreground">{flag}</span>
+                                      ) : val ? (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">NORMAL</span>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground/45 italic">Pending</span>
+                                      )}
+                                    </td>
+                                  </>
+                                )}
                               </tr>
                             );
                           })}
@@ -600,21 +615,7 @@ export default function ResultEntryPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Custom Editor Dialog */}
-      <Dialog open={customEditorActiveItemId !== null} onOpenChange={(o) => !o && setCustomEditorActiveItemId(null)}>
-        <DialogContent hideClose className="max-w-4xl p-0 overflow-hidden bg-transparent border-none shadow-none">
-          <DialogTitle className="sr-only">Custom Editor</DialogTitle>
-          {customEditorActiveItemId !== null && (
-            <TipTapEditor 
-              title="Custom Editor"
-              value={values[customEditorActiveItemId] || ""} 
-              onChange={(html) => handleValueChange(customEditorActiveItemId, html)} 
-              onSave={() => setCustomEditorActiveItemId(null)}
-              onClose={() => setCustomEditorActiveItemId(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

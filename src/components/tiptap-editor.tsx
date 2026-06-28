@@ -121,12 +121,22 @@ const FontSize = Extension.create({
 interface TipTapEditorProps {
   value: string;
   onChange: (value: string) => void;
-  onSave: () => void;
-  onClose: () => void;
+  onSave?: () => void;
+  onClose?: () => void;
   title?: string;
+  hideHeader?: boolean;
+  hideFooter?: boolean;
 }
 
-export function TipTapEditor({ value, onChange, onSave, onClose, title = "Interpretation" }: TipTapEditorProps) {
+export function TipTapEditor({ 
+  value, 
+  onChange, 
+  onSave, 
+  onClose, 
+  title = "Interpretation",
+  hideHeader = false,
+  hideFooter = false
+}: TipTapEditorProps) {
   const [currentFontSize, setCurrentFontSize] = useState(16); // default 16px
   
   const [tablePropsOpen, setTablePropsOpen] = useState(false);
@@ -318,16 +328,22 @@ export function TipTapEditor({ value, onChange, onSave, onClose, title = "Interp
         </DialogContent>
       </Dialog>
 
-      {/* Modal Header */}
-      <div className="flex items-center justify-between px-6 py-4">
-        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-        <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      
-      {/* Divider */}
-      <div className="h-[1px] bg-border/40 w-full"></div>
+      {!hideHeader && (
+        <>
+          {/* Modal Header */}
+          <div className="flex items-center justify-between px-6 py-4">
+            <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+            {onClose && (
+              <button onClick={onClose} className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            )}
+          </div>
+          
+          {/* Divider */}
+          <div className="h-[1px] bg-border/40 w-full"></div>
+        </>
+      )}
       
       {/* Custom Fixed Toolbar */}
       <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 bg-muted/20">
@@ -455,26 +471,30 @@ export function TipTapEditor({ value, onChange, onSave, onClose, title = "Interp
         </div>
       </div>
 
-      {/* Footer Controls Bar */}
-      <div className="h-[1px] bg-border/40 w-full"></div>
-      
-      <div className="flex items-center justify-between px-4 py-3 bg-white relative">
-        <div className="text-xs font-medium text-muted-foreground">
-          {wordCount} {wordCount === 1 ? "word" : "words"}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onClose} className="px-6">Cancel</Button>
-          <Button onClick={onSave} className="px-6">Save</Button>
-        </div>
+      {!hideFooter && (
+        <>
+          {/* Footer Controls Bar */}
+          <div className="h-[1px] bg-border/40 w-full"></div>
+          
+          <div className="flex items-center justify-between px-4 py-3 bg-white relative">
+            <div className="text-xs font-medium text-muted-foreground">
+              {wordCount} {wordCount === 1 ? "word" : "words"}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {onClose && <Button variant="outline" onClick={onClose} className="px-6">Cancel</Button>}
+              {onSave && <Button onClick={onSave} className="px-6">Save</Button>}
+            </div>
 
-        {/* Resize Anchor Element */}
-        <div className="absolute bottom-0 right-0 w-4 h-4 pointer-events-none">
-          <svg viewBox="0 0 10 10" className="w-full h-full text-muted-foreground/30">
-            <path d="M 8 2 L 10 0 L 10 10 L 0 10 L 2 8 L 8 8 Z" fill="currentColor"/>
-          </svg>
-        </div>
-      </div>
+            {/* Resize Anchor Element */}
+            <div className="absolute bottom-0 right-0 w-4 h-4 pointer-events-none">
+              <svg viewBox="0 0 10 10" className="w-full h-full text-muted-foreground/30">
+                <path d="M 8 2 L 10 0 L 10 10 L 0 10 L 2 8 L 8 8 Z" fill="currentColor"/>
+              </svg>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

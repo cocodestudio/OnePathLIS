@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Search, UserPlus, User, Eye, Edit2, Trash2, Loader2, AlertCircle, Users,
+  Search, UserPlus, User, Eye, Edit2, Trash2, Loader2, AlertCircle, Users, X
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
@@ -26,6 +26,7 @@ export default function PatientsPage() {
   const toast = useToast();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [search, setSearch] = useState("");
+  const [filterDate, setFilterDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
 
   const [viewPatient, setViewPatient] = useState<Patient | null>(null);
@@ -55,12 +56,17 @@ export default function PatientsPage() {
     }
   };
 
-  const filteredPatients = patients.filter(
-    (p) =>
+  const filteredPatients = patients.filter((p) => {
+    const matchesSearch =
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.phone.includes(search) ||
-      p.customId.toLowerCase().includes(search.toLowerCase())
-  );
+      p.customId.toLowerCase().includes(search.toLowerCase());
+    
+    // Using string matching for YYYY-MM-DD
+    const matchesDate = filterDate ? p.createdAt.startsWith(filterDate) : true;
+    
+    return matchesSearch && matchesDate;
+  });
 
   const handleOpenEdit = (patient: Patient) => {
     setEditPatient(patient);
@@ -127,10 +133,31 @@ export default function PatientsPage() {
         </Link>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
-        <Input placeholder="Search by name, phone, or ID…" className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center">
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 pointer-events-none" />
+          <Input placeholder="Search by name, phone, or ID…" className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Input 
+            type="date" 
+            className="w-full sm:w-[150px]"
+            value={filterDate} 
+            onChange={(e) => setFilterDate(e.target.value)} 
+          />
+          {filterDate && (
+            <Button 
+              onClick={() => setFilterDate("")} 
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 shrink-0"
+              title="Clear date"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* List */}

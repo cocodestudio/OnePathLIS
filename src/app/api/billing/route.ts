@@ -14,7 +14,22 @@ export async function GET() {
       where: { labId: session.user.labId },
       include: {
         patient: true,
-        reports: true,
+        lab: true,
+        reports: {
+          include: {
+            results: {
+              include: { 
+                test: {
+                  include: {
+                    parent: {
+                      include: { parent: true }
+                    }
+                  }
+                } 
+              }
+            }
+          }
+        },
       },
       orderBy: { createdAt: "desc" },
     });

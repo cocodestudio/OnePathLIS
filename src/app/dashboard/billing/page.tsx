@@ -8,25 +8,43 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Search, Receipt, Edit2, Calendar, User, CheckCircle2, AlertTriangle,
-  Loader2, ArrowRight, ChevronLeft, ChevronRight, FileDown, TrendingUp, Wallet,
+  Loader2, ArrowRight, ChevronLeft, ChevronRight, FileDown, TrendingUp, Wallet, X, FileText, Printer
 } from "lucide-react";
+import { useReactToPrint } from "react-to-print";
+import { InvoiceSheet } from "@/components/invoice-sheet";
 
-interface Patient { name: string; customId: string; phone: string; }
-interface Report { customId: string; }
+interface Patient { name: string; customId: string; phone: string; age: number; gender: string; refDoctor: string; address?: string; }
+interface Test { id: string; name: string; price: number; }
+interface Result { test: Test; }
+interface Report { customId: string; results: Result[]; }
+interface Lab { 
+  name: string; email: string; address: string; logoUrl: string | null;
+  printBgImage: string | null; printHeaderHeight: number; printFooterHeight: number;
+  printMarginLeft: number; printMarginRight: number;
+}
 interface Bill {
   id: string; customId: string; total: number; discount: number; paidAmount: number;
-  status: string; createdAt: string; patient: Patient; reports: Report[];
+  status: string; createdAt: string; patient: Patient; reports: Report[]; lab: Lab;
 }
 
 export default function BillingPage() {
   const [bills, setBills] = useState<Bill[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [filterDate, setFilterDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState<any>(null);
+  const printRef = React.useRef<HTMLDivElement>(null);
+  
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: viewingInvoice ? `Invoice_${viewingInvoice.customId}` : "Invoice",
+  });
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [discountVal, setDiscountVal] = useState("");
   const [paidAmountVal, setPaidAmountVal] = useState("");
@@ -59,6 +77,12 @@ export default function BillingPage() {
     setIsEditDialogOpen(true);
   };
 
+  const handleViewInvoice = (bill: Bill) => {
+    const tests = bill.reports.flatMap(r => r.results.map(res => res.test));
+    setViewingInvoice({ ...bill, tests });
+    setTimeout(() => handlePrint(), 150);
+  };
+
   const handleSaveBill = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingBill) return;
@@ -86,7 +110,11 @@ export default function BillingPage() {
       b.patient.name.toLowerCase().includes(search.toLowerCase()) ||
       b.patient.customId.toLowerCase().includes(search.toLowerCase()) ||
       b.customId.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch && (statusFilter === "ALL" || b.status === statusFilter);
+    
+    // YYYY-MM-DD match
+    const matchesDate = filterDate ? b.createdAt.startsWith(filterDate) : true;
+    
+    return matchesSearch && (statusFilter === "ALL" || b.status === statusFilter) && matchesDate;
   });
 
   const totalRows = filteredBills.length;
@@ -95,7 +123,7 @@ export default function BillingPage() {
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = filteredBills.slice(indexOfFirstRow, indexOfLastRow);
 
-  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter, filterDate]);
 
   const totalPaidRevenue = bills.filter((b) => b.status === "PAID").reduce((s, b) => s + b.total, 0);
   const totalOutstanding = bills.filter((b) => b.status === "UNPAID" || b.status === "PARTIAL").reduce((s, b) => s + b.total, 0);
@@ -149,18 +177,50 @@ export default function BillingPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-card border border-border/70 rounded-xl p-4 shadow-card flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="relative w-full md:max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-          <Input placeholder="Search patient, ID, or bill…" className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <div className="flex flex-wrap gap-1 bg-muted/50 p-1 rounded-lg border border-border/60">
-          {["ALL", "PAID", "PARTIAL", "UNPAID"].map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`h-8 px-3.5 rounded-md text-xs font-semibold uppercase tracking-wide transition-all ${statusFilter === s ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-              {s === "ALL" ? "All" : s.toLowerCase()}
-            </button>
-          ))}
+      <div className="bg-card border border-border/70 rounded-xl p-5 shadow-card">
+        <div className="flex flex-col sm:flex-row flex-wrap items-end gap-4">
+          <div className="space-y-1.5 flex-1 min-w-[200px]">
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+              <Input placeholder="Patient name, ID, or bill number…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </div>
+          
+          <div className="space-y-1.5 w-full sm:w-auto">
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Date</label>
+            <div className="flex items-center gap-2">
+              <Input 
+                type="date" 
+                className="w-full sm:w-[150px]"
+                value={filterDate} 
+                onChange={(e) => setFilterDate(e.target.value)} 
+              />
+              {filterDate && (
+                <Button 
+                  onClick={() => setFilterDate("")} 
+                  variant="outline"
+                  size="icon"
+                  className="h-10 w-10 shrink-0"
+                  title="Clear date"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5 w-full sm:w-[180px]">
+            <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Payment Status</label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["ALL", "PAID", "PARTIAL", "UNPAID"].map((s) => (
+                  <SelectItem key={s} value={s}>{s === "ALL" ? "All invoices" : s.charAt(0) + s.slice(1).toLowerCase()}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -208,7 +268,10 @@ export default function BillingPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditDialog(bill)} title="Edit invoice"><Edit2 className="h-3.5 w-3.5" /></Button>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleViewInvoice(bill)} title="View invoice"><FileText className="h-3.5 w-3.5" /></Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleOpenEditDialog(bill)} title="Edit invoice"><Edit2 className="h-3.5 w-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -305,6 +368,23 @@ export default function BillingPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden Invoice for Printing */}
+      <div className="hidden">
+        {viewingInvoice && (
+          <InvoiceSheet 
+            invoice={viewingInvoice} 
+            ref={printRef} 
+            settings={{
+              bgImage: null, // Do not use custom background for invoice
+              headerHeight: viewingInvoice.lab.printHeaderHeight,
+              footerHeight: viewingInvoice.lab.printFooterHeight,
+              marginLeft: viewingInvoice.lab.printMarginLeft,
+              marginRight: viewingInvoice.lab.printMarginRight,
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 }

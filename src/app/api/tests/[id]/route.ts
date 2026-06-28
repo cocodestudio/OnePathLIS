@@ -14,7 +14,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { name, category, interpretation, fieldType, type, price, unit, genderRefType, refRangeMin, refRangeMax, refRangeMinMale, refRangeMaxMale, refRangeMinFemale, refRangeMaxFemale, subTests } = body;
+    const { name, category, interpretation, fieldType, type, price, unit, genderRefType, refRangeMin, refRangeMax, refRangeMinMale, refRangeMaxMale, refRangeMinFemale, refRangeMaxFemale, subTests, valueType, customOptions } = body;
 
     const test = await prisma.test.findUnique({
       where: { id: params.id },
@@ -43,6 +43,8 @@ export async function PUT(
           refRangeMaxMale: refRangeMaxMale !== undefined && refRangeMaxMale !== "" ? parseFloat(refRangeMaxMale) : test.refRangeMaxMale,
           refRangeMinFemale: refRangeMinFemale !== undefined && refRangeMinFemale !== "" ? parseFloat(refRangeMinFemale) : test.refRangeMinFemale,
           refRangeMaxFemale: refRangeMaxFemale !== undefined && refRangeMaxFemale !== "" ? parseFloat(refRangeMaxFemale) : test.refRangeMaxFemale,
+          valueType: valueType !== undefined ? valueType : test.valueType,
+          customOptions: customOptions !== undefined ? (customOptions ? JSON.stringify(customOptions) : null) : test.customOptions,
         },
       });
 
@@ -75,6 +77,8 @@ export async function PUT(
             refRangeMaxMale: sub.refRangeMaxMale !== undefined && sub.refRangeMaxMale !== "" ? parseFloat(sub.refRangeMaxMale) : null,
             refRangeMinFemale: sub.refRangeMinFemale !== undefined && sub.refRangeMinFemale !== "" ? parseFloat(sub.refRangeMinFemale) : null,
             refRangeMaxFemale: sub.refRangeMaxFemale !== undefined && sub.refRangeMaxFemale !== "" ? parseFloat(sub.refRangeMaxFemale) : null,
+            valueType: sub.valueType || "Numeric",
+            customOptions: sub.customOptions ? JSON.stringify(sub.customOptions) : null,
           };
 
           if (sub.id) {
@@ -103,6 +107,8 @@ export async function PUT(
                   refRangeMaxMale: subsub.refRangeMaxMale !== undefined && subsub.refRangeMaxMale !== "" ? parseFloat(subsub.refRangeMaxMale) : null,
                   refRangeMinFemale: subsub.refRangeMinFemale !== undefined && subsub.refRangeMinFemale !== "" ? parseFloat(subsub.refRangeMinFemale) : null,
                   refRangeMaxFemale: subsub.refRangeMaxFemale !== undefined && subsub.refRangeMaxFemale !== "" ? parseFloat(subsub.refRangeMaxFemale) : null,
+                  valueType: subsub.valueType || "Numeric",
+                  customOptions: subsub.customOptions ? JSON.stringify(subsub.customOptions) : null,
                 };
                 
                 if (subsub.id) {
@@ -149,6 +155,8 @@ export async function PUT(
                   refRangeMaxMale: subsub.refRangeMaxMale !== undefined && subsub.refRangeMaxMale !== "" ? parseFloat(subsub.refRangeMaxMale) : null,
                   refRangeMinFemale: subsub.refRangeMinFemale !== undefined && subsub.refRangeMinFemale !== "" ? parseFloat(subsub.refRangeMinFemale) : null,
                   refRangeMaxFemale: subsub.refRangeMaxFemale !== undefined && subsub.refRangeMaxFemale !== "" ? parseFloat(subsub.refRangeMaxFemale) : null,
+                  valueType: subsub.valueType || "Numeric",
+                  customOptions: subsub.customOptions ? JSON.stringify(subsub.customOptions) : null,
                 }))
               });
             }

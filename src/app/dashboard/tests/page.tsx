@@ -29,6 +29,7 @@ interface Test {
   unit: string | null; genderRefType: string; refRangeMin: number | null; refRangeMax: number | null;
   refRangeMinMale: number | null; refRangeMaxMale: number | null;
   refRangeMinFemale: number | null; refRangeMaxFemale: number | null;
+  valueType?: string; customOptions?: string;
   subTests?: Test[];
 }
 
@@ -46,6 +47,8 @@ interface SubTestState {
   subTests?: SubTestState[];
   fieldType?: string;
   interpretation?: string;
+  valueType?: string;
+  customOptions?: string[];
 }
 
 export default function TestMasterPage() {
@@ -66,6 +69,14 @@ export default function TestMasterPage() {
   const [interpretation, setInterpretation] = useState("");
   const [interpretationModalOpen, setInterpretationModalOpen] = useState(false);
   const [customEditorActiveSubIndex, setCustomEditorActiveSubIndex] = useState<number | null>(null);
+  
+  // Custom Options Modal State
+  const [customOptionsModalOpen, setCustomOptionsModalOpen] = useState(false);
+  const [activeCustomOptionsSubIndex, setActiveCustomOptionsSubIndex] = useState<number | null>(null);
+  const [activeCustomOptionsSubSubIndex, setActiveCustomOptionsSubSubIndex] = useState<number | null>(null);
+  const [tempCustomOptions, setTempCustomOptions] = useState<string[]>([]);
+  const [newOptionInput, setNewOptionInput] = useState("");
+
   const [type, setType] = useState("Pathology");
   const [price, setPrice] = useState("");
   
@@ -77,7 +88,42 @@ export default function TestMasterPage() {
   const subtestsEndRef = useRef<HTMLDivElement>(null);
 
   const dynamicCategories = Array.from(new Set(tests.map(t => t.category).filter(Boolean)));
-  const standardCategories = Array.from(new Set([...dynamicCategories, "Hematology", "Biochemistry", "Hormones", "Vitamins", "Radiology", "Cardiology", "Pathology Packages", "Other"]));
+  const standardCategories = Array.from(new Set([
+    ...dynamicCategories, 
+    "Haematology",
+    "Biochemistry",
+    "Clinical Chemistry",
+    "Clinical Pathology",
+    "Routine",
+    "Serology",
+    "Immunology",
+    "Microbiology",
+    "Histopathology",
+    "Biopsy",
+    "Cytology",
+    "Endocrinology",
+    "Hormones",
+    "Immunohaematology",
+    "Blood Bank",
+    "Andrology",
+    "Molecular Biology",
+    "PCR",
+    "Parasitology",
+    "Toxicology",
+    "Genetics",
+    "Cytogenetics",
+    "Flow Cytometry",
+    "Radiology",
+    "Imaging",
+    "Phlebotomy",
+    "Sample Collection",
+    "Reference",
+    "Outside Lab",
+    "Quality Control (QC)",
+    "Report Dispatch",
+    "MIS",
+    "Other"
+  ]));
   const standardTypes = ["Pathology", "Radiology", "Cardiology", "Other"];
 
   useEffect(() => { fetchTests(); }, []);
@@ -101,7 +147,8 @@ export default function TestMasterPage() {
     setInterpretation(""); 
     setSubTests([{
       name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
-      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: "", fieldType: "Single Field"
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: "", fieldType: "Single Field",
+      valueType: "Numeric", customOptions: []
     }]);
     setError(null); setSuccess(null); setDialogOpen(true);
   };
@@ -129,6 +176,8 @@ export default function TestMasterPage() {
         refRangeMaxFemale: sub.refRangeMaxFemale?.toString() || "",
         fieldType: sub.fieldType || "Single Field",
         interpretation: sub.interpretation || "",
+        valueType: sub.valueType || "Numeric",
+        customOptions: sub.customOptions ? JSON.parse(sub.customOptions) : [],
         subTests: sub.subTests ? sub.subTests.map(subsub => ({
           id: subsub.id,
           name: subsub.name,
@@ -140,6 +189,8 @@ export default function TestMasterPage() {
           refRangeMaxMale: subsub.refRangeMaxMale?.toString() || "",
           refRangeMinFemale: subsub.refRangeMinFemale?.toString() || "",
           refRangeMaxFemale: subsub.refRangeMaxFemale?.toString() || "",
+          valueType: subsub.valueType || "Numeric",
+          customOptions: subsub.customOptions ? JSON.parse(subsub.customOptions) : [],
         })) : []
       })));
     } else {
@@ -154,6 +205,8 @@ export default function TestMasterPage() {
         refRangeMaxMale: test.refRangeMaxMale?.toString() || "",
         refRangeMinFemale: test.refRangeMinFemale?.toString() || "",
         refRangeMaxFemale: test.refRangeMaxFemale?.toString() || "",
+        valueType: test.valueType || "Numeric",
+        customOptions: test.customOptions ? JSON.parse(test.customOptions) : [],
       }]);
     }
     
@@ -163,7 +216,8 @@ export default function TestMasterPage() {
   const handleAddSubTest = () => {
     setSubTests([...subTests, {
       name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
-      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: ""
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: "",
+      valueType: "Numeric", customOptions: []
     }]);
     setTimeout(() => {
       subtestsEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -174,7 +228,7 @@ export default function TestMasterPage() {
     setSubTests(subTests.filter((_, i) => i !== index));
   };
 
-  const updateSubTest = (index: number, field: keyof SubTestState, value: string) => {
+  const updateSubTest = (index: number, field: keyof SubTestState, value: any) => {
     const updated = [...subTests];
     updated[index] = { ...updated[index], [field]: value };
     
@@ -191,7 +245,8 @@ export default function TestMasterPage() {
     if (!updated[index].subTests) updated[index].subTests = [];
     updated[index].subTests!.push({
       name: "", unit: "", genderRefType: "BOTH", refRangeMin: "", refRangeMax: "",
-      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: ""
+      refRangeMinMale: "", refRangeMaxMale: "", refRangeMinFemale: "", refRangeMaxFemale: "",
+      valueType: "Numeric", customOptions: []
     });
     setSubTests(updated);
   };
@@ -202,10 +257,19 @@ export default function TestMasterPage() {
     setSubTests(updated);
   };
 
-  const updateSubSubTest = (index: number, subIndex: number, field: keyof SubTestState, value: string) => {
+  const updateSubSubTest = (index: number, subIndex: number, field: keyof SubTestState, value: any) => {
     const updated = [...subTests];
     updated[index].subTests![subIndex] = { ...updated[index].subTests![subIndex], [field]: value };
     setSubTests(updated);
+  };
+
+  const openCustomOptionsModal = (index: number, subIndex: number | null = null) => {
+    setActiveCustomOptionsSubIndex(index);
+    setActiveCustomOptionsSubSubIndex(subIndex);
+    const sub = subIndex === null ? subTests[index] : subTests[index].subTests![subIndex];
+    setTempCustomOptions([...(sub.customOptions || [])]);
+    setNewOptionInput("");
+    setCustomOptionsModalOpen(true);
   };
 
   const handleSaveTest = async (e: React.FormEvent) => {
@@ -245,6 +309,8 @@ export default function TestMasterPage() {
             refRangeMaxMale: sub.refRangeMaxMale,
             refRangeMinFemale: sub.refRangeMinFemale,
             refRangeMaxFemale: sub.refRangeMaxFemale,
+            valueType: sub.valueType || "Numeric",
+            customOptions: sub.customOptions || [],
             fieldType: sub.fieldType || "Single Field",
             interpretation: sub.interpretation || null,
             subTests: sub.fieldType === "Multiple Field" && sub.subTests ? sub.subTests.map(ss => ({
@@ -258,6 +324,8 @@ export default function TestMasterPage() {
               refRangeMaxMale: ss.refRangeMaxMale,
               refRangeMinFemale: ss.refRangeMinFemale,
               refRangeMaxFemale: ss.refRangeMaxFemale,
+              valueType: ss.valueType || "Numeric",
+              customOptions: ss.customOptions || [],
             })) : undefined
           }))
         }),
@@ -422,18 +490,66 @@ export default function TestMasterPage() {
                                 <tr className="border-b border-border/40 text-muted-foreground">
                                   <th className="pb-2 font-medium">Parameter Name</th>
                                   <th className="pb-2 font-medium text-center">Unit</th>
-                                  <th className="pb-2 font-medium text-right">Ref. Range</th>
+                                  <th className="pb-2 font-medium text-right">Details / Range</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {test.subTests.map(sub => (
-                                  <tr key={sub.id} className="border-b border-border/20 last:border-0">
-                                    <td className="py-2.5 font-medium text-foreground">{sub.name}</td>
-                                    <td className="py-2.5 text-center text-muted-foreground">{sub.unit}</td>
-                                    <td className="py-2.5 text-right font-mono text-muted-foreground">
-                                      {sub.genderRefType === "GENDER_SPECIFIC" ? "Gender Specific" : `${sub.refRangeMin} – ${sub.refRangeMax}`}
-                                    </td>
-                                  </tr>
+                                  <React.Fragment key={sub.id}>
+                                    <tr className="border-b border-border/20 last:border-0">
+                                      <td className="py-2.5 font-medium text-foreground">
+                                        <div className="flex flex-col">
+                                          <span>{sub.name}</span>
+                                        </div>
+                                      </td>
+                                      <td className="py-2.5 text-center text-muted-foreground">
+                                        {sub.fieldType !== "Multiple Field" && sub.fieldType !== "Custom Editor" && sub.valueType !== "Custom" ? sub.unit || "-" : "-"}
+                                      </td>
+                                      <td className="py-2.5 text-right font-mono text-muted-foreground">
+                                        {sub.fieldType === "Custom Editor" ? (
+                                          <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-sans font-semibold">Custom Editor Template</span>
+                                        ) : sub.fieldType === "Multiple Field" ? (
+                                          <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded font-sans font-semibold">Group Parameter</span>
+                                        ) : sub.valueType === "Custom" ? (
+                                          <span className="text-[10px] text-muted-foreground font-sans truncate max-w-[150px] inline-block" title={sub.customOptions}>
+                                            {(() => {
+                                              try {
+                                                const arr = JSON.parse(sub.customOptions || "[]");
+                                                return arr.length > 0 ? "Options: " + arr.join(", ") : "Custom Text (No Suggestions)";
+                                              } catch { return "Custom Text"; }
+                                            })()}
+                                          </span>
+                                        ) : (
+                                          sub.genderRefType === "GENDER_SPECIFIC" ? "Gender Specific" : `${sub.refRangeMin ?? 0} – ${sub.refRangeMax ?? 0}`
+                                        )}
+                                      </td>
+                                    </tr>
+                                    {sub.fieldType === "Multiple Field" && sub.subTests && sub.subTests.map(ss => (
+                                      <tr key={ss.id} className="border-b border-border/10 last:border-0 bg-muted/5">
+                                        <td className="py-2 pl-6 font-medium text-muted-foreground flex items-center">
+                                          <span className="w-3 h-[1px] bg-border mr-2 inline-block"></span>
+                                          {ss.name}
+                                        </td>
+                                        <td className="py-2 text-center text-muted-foreground">
+                                          {ss.valueType !== "Custom" ? ss.unit || "-" : "-"}
+                                        </td>
+                                        <td className="py-2 text-right font-mono text-muted-foreground">
+                                          {ss.valueType === "Custom" ? (
+                                            <span className="text-[10px] text-muted-foreground font-sans truncate max-w-[150px] inline-block">
+                                              {(() => {
+                                                try {
+                                                  const arr = JSON.parse(ss.customOptions || "[]");
+                                                  return arr.length > 0 ? "Options: " + arr.join(", ") : "Custom Text (No Suggestions)";
+                                                } catch { return "Custom Text"; }
+                                              })()}
+                                            </span>
+                                          ) : (
+                                            ss.genderRefType === "GENDER_SPECIFIC" ? "Gender Specific" : `${ss.refRangeMin ?? 0} – ${ss.refRangeMax ?? 0}`
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </React.Fragment>
                                 ))}
                               </tbody>
                             </table>
@@ -451,7 +567,7 @@ export default function TestMasterPage() {
 
       {/* Add/Edit modal */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="max-w-full w-screen h-screen max-h-screen p-0 m-0 border-0 rounded-none overflow-hidden flex flex-col">
           <DialogHeader className="px-6 py-4 border-b border-border/60 bg-muted/20 shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center text-primary-foreground"><FlaskConical className="h-5 w-5" /></div>
@@ -462,109 +578,141 @@ export default function TestMasterPage() {
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <form id="test-form" onSubmit={handleSaveTest} className="space-y-6">
+          <form id="test-form" onSubmit={handleSaveTest} className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* Left Section: Main Test */}
+            <div className="w-full md:w-[320px] shrink-0 p-6 border-b md:border-b-0 md:border-r border-border/60 bg-muted/5 overflow-y-auto custom-scrollbar flex flex-col gap-6">
               {error && <div className="flex items-center gap-2 rounded-lg bg-destructive/8 border border-destructive/20 p-3 text-xs text-destructive font-medium"><AlertTriangle className="h-4 w-4 shrink-0" /><p>{error}</p></div>}
               {success && <div className="flex items-center gap-2 rounded-lg bg-accent border border-primary/20 p-3 text-xs text-primary font-medium"><CheckCircle2 className="h-4 w-4 shrink-0" /><p>{success}</p></div>}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5"><Label>Main Test Name</Label><Input placeholder="e.g. Complete Blood Count (CBC)" value={name} onChange={(e) => setName(e.target.value)} required /></div>
-                <div className="space-y-1.5"><Label>Package Price (₹)</Label><Input type="number" step="0.01" placeholder="e.g. 500" value={price} onChange={(e) => setPrice(e.target.value)} className="font-mono" required /></div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Category</Label>
-                  <Select value={category} onValueChange={setCategory}>
+              <div className="space-y-1.5"><Label className="text-sm">Main Test Name</Label><Input placeholder="e.g. Complete Blood Count (CBC)" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+              <div className="space-y-1.5"><Label className="text-sm">Package Price (₹)</Label><Input type="number" step="0.01" placeholder="e.g. 500" value={price} onChange={(e) => setPrice(e.target.value)} className="font-mono" required /></div>
+              
+              <div className="space-y-1.5">
+                <Label className="text-sm">Category</Label>
+                <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{standardCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                {category === "Other" && (
-                  <div className="space-y-1.5"><Label>Custom Category</Label><Input placeholder="e.g. Serology" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} required /></div>
-                )}
+                  <SelectContent position="popper" side="bottom" sideOffset={4} className="max-h-[300px]">
+                    {standardCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               
-              <div className="flex justify-start">
-                <Button type="button" variant="outline" onClick={() => setInterpretationModalOpen(true)} className="gap-2">
+              {category === "Other" && (
+                <div className="space-y-1.5"><Label className="text-sm">Custom Category</Label><Input placeholder="e.g. Serology" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} required /></div>
+              )}
+              
+              <div className="pt-2">
+                <Button type="button" variant="outline" onClick={() => setInterpretationModalOpen(true)} className="gap-2 w-full justify-start text-muted-foreground hover:text-foreground">
                   <FileText className="h-4 w-4" />
-                  View Interpretation
+                  {interpretation ? "Edit Interpretation" : "Add Interpretation"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Right Section: Sub Tests */}
+            <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+              <div className="flex items-center justify-between mb-6 pb-2 border-b border-border/60">
+                <div>
+                  <h3 className="font-semibold text-lg text-foreground">Test Parameters</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Define the parameters and values for this test package.</p>
+                </div>
+                <Button type="button" size="sm" onClick={handleAddSubTest} className="h-9 gap-1.5">
+                  <Plus className="h-4 w-4" /> Add Parameter
                 </Button>
               </div>
 
-              <div className="border-t border-border/60 pt-5">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-sm">Test Parameters (Sub-tests)</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">Add individual parameters that belong to this test.</p>
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={handleAddSubTest} className="h-8">
-                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Parameter
-                  </Button>
-                </div>
-
-                <div className="space-y-4">
-                  {subTests.map((sub, index) => (
-                    <div key={index} className="bg-muted/20 border border-border/70 rounded-xl p-4 relative group">
+              <div className="space-y-5">
+                {subTests.map((sub, index) => (
+                  <div key={index} className="bg-card border border-border/70 shadow-sm rounded-xl p-5 relative group">
                       {subTests.length > 1 && (
                         <button type="button" onClick={() => handleRemoveSubTest(index)} className="absolute right-3 top-3 p-1.5 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       )}
                       
-                      <div className="grid grid-cols-12 gap-4 mb-3 pr-8">
-                        {sub.fieldType !== "Custom Editor" && (
-                          <div className={sub.fieldType === "Multiple Field" ? "col-span-8 space-y-1.5" : "col-span-5 space-y-1.5"}>
-                            <Label className="text-xs">Parameter Name</Label>
-                            <Input placeholder="e.g. Hemoglobin" value={sub.name} onChange={(e) => updateSubTest(index, "name", e.target.value)} className="h-8 text-sm" required />
-                          </div>
-                        )}
-                        {sub.fieldType !== "Multiple Field" && sub.fieldType !== "Custom Editor" && (
-                          <div className="col-span-3 space-y-1.5">
-                            <Label className="text-xs">Unit</Label>
-                            <Input list="units-list" placeholder="e.g. g/dL" value={sub.unit} onChange={(e) => updateSubTest(index, "unit", e.target.value)} className="h-8 text-sm" />
-                          </div>
-                        )}
-                        <div className={sub.fieldType === "Custom Editor" ? "col-span-12 space-y-1.5" : "col-span-4 space-y-1.5"}>
-                          <Label className="text-xs">Field Type</Label>
-                          <Select value={sub.fieldType || "Single Field"} onValueChange={(val) => updateSubTest(index, "fieldType", val)}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Single Field">Single Field</SelectItem>
-                              <SelectItem value="Multiple Field">Multiple Field</SelectItem>
-                              <SelectItem value="Custom Editor">Custom Editor</SelectItem>
-                            </SelectContent>
-                          </Select>
+                    <div className="grid grid-cols-12 gap-4 mb-4 pr-8">
+                      {sub.fieldType !== "Custom Editor" && (
+                        <div className={sub.fieldType === "Multiple Field" ? "col-span-8 space-y-1.5" : (sub.valueType === "Custom" ? "col-span-8 space-y-1.5" : "col-span-5 space-y-1.5")}>
+                          <Label className="text-xs">Parameter Name</Label>
+                          <Input placeholder="e.g. Hemoglobin" value={sub.name} onChange={(e) => updateSubTest(index, "name", e.target.value)} className="h-8 text-sm bg-background" required />
                         </div>
+                      )}
+                      {sub.fieldType !== "Multiple Field" && sub.fieldType !== "Custom Editor" && sub.valueType !== "Custom" && (
+                        <div className="col-span-3 space-y-1.5">
+                          <Label className="text-xs">Unit</Label>
+                          <Input list="units-list" placeholder="e.g. g/dL" value={sub.unit} onChange={(e) => updateSubTest(index, "unit", e.target.value)} className="h-8 text-sm bg-background" />
+                        </div>
+                      )}
+                      <div className={sub.fieldType === "Custom Editor" ? "col-span-12 space-y-1.5" : "col-span-4 space-y-1.5"}>
+                        <Label className="text-xs">Field Type</Label>
+                        <Select value={sub.fieldType || "Single Field"} onValueChange={(val) => updateSubTest(index, "fieldType", val)}>
+                          <SelectTrigger className="h-8 text-sm bg-background"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Single Field">Single Field</SelectItem>
+                            <SelectItem value="Multiple Field">Multiple Field</SelectItem>
+                            <SelectItem value="Custom Editor">Custom Editor</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
+                    </div>
 
                       {(!sub.fieldType || sub.fieldType === "Single Field") ? (
                       <div className="bg-background rounded-lg border border-border/50 p-3">
-                        <div className="flex justify-between items-center mb-3">
-                          <Label className="text-xs text-muted-foreground">Reference Range</Label>
-                          <Select value={sub.genderRefType} onValueChange={(val) => updateSubTest(index, "genderRefType", val)}>
-                            <SelectTrigger className="h-7 text-xs w-[130px] border-border"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="BOTH">Universal</SelectItem>
-                              <SelectItem value="GENDER_SPECIFIC">Gender Specific</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        <div className="flex items-center gap-4 mb-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Value Type</Label>
+                            <Select value={sub.valueType || "Numeric"} onValueChange={(val) => updateSubTest(index, "valueType", val)}>
+                              <SelectTrigger className="h-7 text-xs w-[130px] border-border"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Numeric">Numeric</SelectItem>
+                                <SelectItem value="Custom">Custom</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {(!sub.valueType || sub.valueType === "Numeric") && (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Reference Range</Label>
+                              <Select value={sub.genderRefType} onValueChange={(val) => updateSubTest(index, "genderRefType", val)}>
+                                <SelectTrigger className="h-7 text-xs w-[130px] border-border"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="BOTH">Universal</SelectItem>
+                                  <SelectItem value="GENDER_SPECIFIC">Gender Specific</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </div>
 
-                        {sub.genderRefType === "BOTH" ? (
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1"><Label className="text-[10px]">Min</Label><Input type="number" step="0.0001" placeholder="12.0" value={sub.refRangeMin} onChange={(e) => updateSubTest(index, "refRangeMin", e.target.value)} className="h-7 text-xs font-mono" /></div>
-                            <div className="space-y-1"><Label className="text-[10px]">Max</Label><Input type="number" step="0.0001" placeholder="16.0" value={sub.refRangeMax} onChange={(e) => updateSubTest(index, "refRangeMax", e.target.value)} className="h-7 text-xs font-mono" /></div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
+                        {(!sub.valueType || sub.valueType === "Numeric") ? (
+                          sub.genderRefType === "BOTH" ? (
                             <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Min</Label><Input type="number" step="0.0001" value={sub.refRangeMinMale} onChange={(e) => updateSubTest(index, "refRangeMinMale", e.target.value)} className="h-7 text-xs font-mono" /></div>
-                              <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Max</Label><Input type="number" step="0.0001" value={sub.refRangeMaxMale} onChange={(e) => updateSubTest(index, "refRangeMaxMale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                              <div className="space-y-1"><Label className="text-[10px]">Min</Label><Input type="number" step="0.0001" placeholder="12.0" value={sub.refRangeMin} onChange={(e) => updateSubTest(index, "refRangeMin", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                              <div className="space-y-1"><Label className="text-[10px]">Max</Label><Input type="number" step="0.0001" placeholder="16.0" value={sub.refRangeMax} onChange={(e) => updateSubTest(index, "refRangeMax", e.target.value)} className="h-7 text-xs font-mono" /></div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="space-y-1"><Label className="text-[10px] text-pink-500">Female Min</Label><Input type="number" step="0.0001" value={sub.refRangeMinFemale} onChange={(e) => updateSubTest(index, "refRangeMinFemale", e.target.value)} className="h-7 text-xs font-mono" /></div>
-                              <div className="space-y-1"><Label className="text-[10px] text-pink-500">Female Max</Label><Input type="number" step="0.0001" value={sub.refRangeMaxFemale} onChange={(e) => updateSubTest(index, "refRangeMaxFemale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Min</Label><Input type="number" step="0.0001" value={sub.refRangeMinMale} onChange={(e) => updateSubTest(index, "refRangeMinMale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                                <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Max</Label><Input type="number" step="0.0001" value={sub.refRangeMaxMale} onChange={(e) => updateSubTest(index, "refRangeMaxMale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1"><Label className="text-[10px] text-pink-500">Female Min</Label><Input type="number" step="0.0001" value={sub.refRangeMinFemale} onChange={(e) => updateSubTest(index, "refRangeMinFemale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                                <div className="space-y-1"><Label className="text-[10px] text-pink-500">Female Max</Label><Input type="number" step="0.0001" value={sub.refRangeMaxFemale} onChange={(e) => updateSubTest(index, "refRangeMaxFemale", e.target.value)} className="h-7 text-xs font-mono" /></div>
+                              </div>
+                            </div>
+                          )
+                        ) : (
+                          <div className="space-y-2 pt-2 border-t border-border/40">
+                            <Label className="text-xs font-medium text-foreground">Custom Options / Suggestions</Label>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              {(sub.customOptions || []).map((opt, i) => (
+                                <span key={i} className="inline-flex items-center px-2 py-1 rounded bg-secondary text-secondary-foreground text-xs font-medium">
+                                  {opt}
+                                </span>
+                              ))}
+                              <Button type="button" variant="outline" size="sm" onClick={() => openCustomOptionsModal(index)} className="h-7 px-2 border-primary/20 hover:bg-primary/5 text-primary">
+                                <Plus className="h-3 w-3 mr-1" /> Add Option
+                              </Button>
                             </div>
                           </div>
                         )}
@@ -608,34 +756,66 @@ export default function TestMasterPage() {
                             {sub.subTests && sub.subTests.map((subsub, sIdx) => (
                               <div key={sIdx} className="bg-background rounded-lg border border-border/50 p-3 relative group/sub">
                                 <button type="button" onClick={() => handleRemoveSubSubTest(index, sIdx)} className="absolute right-2 top-2 p-1 rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover/sub:opacity-100 transition-all"><Trash2 className="h-3 w-3" /></button>
-                                <div className="grid grid-cols-2 gap-3 mb-2 pr-6">
+                                <div className={`grid ${subsub.valueType === "Custom" ? "grid-cols-1" : "grid-cols-2"} gap-3 mb-2 pr-6`}>
                                   <div className="space-y-1"><Label className="text-[10px]">Name</Label><Input placeholder="Sub Name" value={subsub.name} onChange={(e) => updateSubSubTest(index, sIdx, "name", e.target.value)} className="h-7 text-xs" required /></div>
-                                  <div className="space-y-1"><Label className="text-[10px]">Unit</Label><Input list="units-list" placeholder="Unit" value={subsub.unit} onChange={(e) => updateSubSubTest(index, sIdx, "unit", e.target.value)} className="h-7 text-xs" /></div>
+                                  {subsub.valueType !== "Custom" && (
+                                    <div className="space-y-1"><Label className="text-[10px]">Unit</Label><Input list="units-list" placeholder="Unit" value={subsub.unit} onChange={(e) => updateSubSubTest(index, sIdx, "unit", e.target.value)} className="h-7 text-xs" /></div>
+                                  )}
                                 </div>
-                                <div className="flex justify-between items-center mb-2 mt-2 border-t border-border/30 pt-2">
-                                  <Label className="text-[10px] text-muted-foreground">Ref Range</Label>
-                                  <Select value={subsub.genderRefType} onValueChange={(val) => updateSubSubTest(index, sIdx, "genderRefType", val)}>
-                                    <SelectTrigger className="h-6 text-[10px] w-[110px] border-border"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="BOTH">Universal</SelectItem>
-                                      <SelectItem value="GENDER_SPECIFIC">Gender</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                {subsub.genderRefType === "BOTH" ? (
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1"><Label className="text-[10px]">Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMin} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMin", e.target.value)} className="h-6 text-xs font-mono" /></div>
-                                    <div className="space-y-1"><Label className="text-[10px]">Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMax} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMax", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                <div className="flex items-center gap-4 mb-2 mt-2 border-t border-border/30 pt-2">
+                                  <div className="space-y-1">
+                                    <Label className="text-[10px] text-muted-foreground">Value Type</Label>
+                                    <Select value={subsub.valueType || "Numeric"} onValueChange={(val) => updateSubSubTest(index, sIdx, "valueType", val)}>
+                                      <SelectTrigger className="h-6 text-[10px] w-[90px] border-border"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Numeric">Numeric</SelectItem>
+                                        <SelectItem value="Custom">Custom</SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                   </div>
-                                ) : (
-                                  <div className="space-y-2">
-                                    <div className="grid grid-cols-2 gap-3">
-                                      <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMinMale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMinMale", e.target.value)} className="h-6 text-xs font-mono" /></div>
-                                      <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMaxMale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMaxMale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                  {(!subsub.valueType || subsub.valueType === "Numeric") && (
+                                    <div className="space-y-1">
+                                      <Label className="text-[10px] text-muted-foreground">Ref Range</Label>
+                                      <Select value={subsub.genderRefType} onValueChange={(val) => updateSubSubTest(index, sIdx, "genderRefType", val)}>
+                                        <SelectTrigger className="h-6 text-[10px] w-[90px] border-border"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="BOTH">Universal</SelectItem>
+                                          <SelectItem value="GENDER_SPECIFIC">Gender</SelectItem>
+                                        </SelectContent>
+                                      </Select>
                                     </div>
+                                  )}
+                                </div>
+                                {(!subsub.valueType || subsub.valueType === "Numeric") ? (
+                                  subsub.genderRefType === "BOTH" ? (
                                     <div className="grid grid-cols-2 gap-3">
-                                      <div className="space-y-1"><Label className="text-[10px] text-pink-500">Fem Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMinFemale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMinFemale", e.target.value)} className="h-6 text-xs font-mono" /></div>
-                                      <div className="space-y-1"><Label className="text-[10px] text-pink-500">Fem Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMaxFemale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMaxFemale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                      <div className="space-y-1"><Label className="text-[10px]">Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMin} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMin", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                      <div className="space-y-1"><Label className="text-[10px]">Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMax} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMax", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMinMale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMinMale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                        <div className="space-y-1"><Label className="text-[10px] text-blue-500">Male Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMaxMale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMaxMale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1"><Label className="text-[10px] text-pink-500">Fem Min</Label><Input type="number" step="0.0001" value={subsub.refRangeMinFemale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMinFemale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                        <div className="space-y-1"><Label className="text-[10px] text-pink-500">Fem Max</Label><Input type="number" step="0.0001" value={subsub.refRangeMaxFemale} onChange={(e) => updateSubSubTest(index, sIdx, "refRangeMaxFemale", e.target.value)} className="h-6 text-xs font-mono" /></div>
+                                      </div>
+                                    </div>
+                                  )
+                                ) : (
+                                  <div className="space-y-2 pt-2 border-t border-border/40">
+                                    <Label className="text-[10px] font-medium text-foreground">Custom Options</Label>
+                                    <div className="flex flex-wrap gap-1.5 items-center">
+                                      {(subsub.customOptions || []).map((opt, i) => (
+                                        <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded bg-secondary text-secondary-foreground text-[10px] font-medium">
+                                          {opt}
+                                        </span>
+                                      ))}
+                                      <Button type="button" variant="outline" size="sm" onClick={() => openCustomOptionsModal(index, sIdx)} className="h-5 px-1.5 py-0 text-[10px] border-primary/20 hover:bg-primary/5 text-primary">
+                                        <Plus className="h-2.5 w-2.5 mr-0.5" /> Add
+                                      </Button>
                                     </div>
                                   </div>
                                 )}
@@ -649,14 +829,91 @@ export default function TestMasterPage() {
                   <div ref={subtestsEndRef} />
                 </div>
               </div>
-            </form>
-          </div>
-          
-          <DialogFooter className="px-6 py-4 border-t border-border/60 bg-muted/20 shrink-0">
-            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+          </form>
+          <DialogFooter className="px-6 py-4 border-t border-border/60 bg-muted/20 shrink-0 mt-auto">
+            <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
             <Button type="submit" form="test-form" disabled={saving}>
               {saving ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving…</>) : editingTest ? "Update Package" : "Create Package"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Options Modal */}
+      <Dialog open={customOptionsModalOpen} onOpenChange={(o) => {
+        if (!o) {
+          setCustomOptionsModalOpen(false);
+          setActiveCustomOptionsSubIndex(null);
+          setActiveCustomOptionsSubSubIndex(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Custom Options / Suggestions</DialogTitle>
+            <DialogDescription>
+              Add suggestions that the user can pick from when entering results for this custom field.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex gap-2">
+              <Input 
+                placeholder="e.g. Reactive, Positive, Detected..." 
+                value={newOptionInput} 
+                onChange={(e) => setNewOptionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (newOptionInput.trim() && !tempCustomOptions.includes(newOptionInput.trim())) {
+                      setTempCustomOptions([...tempCustomOptions, newOptionInput.trim()]);
+                      setNewOptionInput("");
+                    }
+                  }
+                }}
+              />
+              <Button 
+                type="button" 
+                onClick={() => {
+                  if (newOptionInput.trim() && !tempCustomOptions.includes(newOptionInput.trim())) {
+                    setTempCustomOptions([...tempCustomOptions, newOptionInput.trim()]);
+                    setNewOptionInput("");
+                  }
+                }}
+              >
+                Add
+              </Button>
+            </div>
+            
+            <div className="bg-muted/30 border border-border/60 rounded-lg p-3 min-h-[100px] flex flex-wrap gap-2 items-start content-start">
+              {tempCustomOptions.length === 0 ? (
+                <span className="text-xs text-muted-foreground w-full text-center py-4">No options added yet.</span>
+              ) : (
+                tempCustomOptions.map((opt, i) => (
+                  <span key={i} className="inline-flex items-center pl-2 pr-1 py-1 rounded bg-secondary text-secondary-foreground text-xs font-medium border border-border/40">
+                    {opt}
+                    <button 
+                      type="button" 
+                      onClick={() => setTempCustomOptions(tempCustomOptions.filter((_, idx) => idx !== i))}
+                      className="ml-1 p-0.5 rounded-sm hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCustomOptionsModalOpen(false)}>Cancel</Button>
+            <Button type="button" onClick={() => {
+              if (activeCustomOptionsSubIndex !== null) {
+                if (activeCustomOptionsSubSubIndex !== null) {
+                  updateSubSubTest(activeCustomOptionsSubIndex, activeCustomOptionsSubSubIndex, "customOptions", tempCustomOptions);
+                } else {
+                  updateSubTest(activeCustomOptionsSubIndex, "customOptions", tempCustomOptions);
+                }
+              }
+              setCustomOptionsModalOpen(false);
+            }}>Save Options</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
