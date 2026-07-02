@@ -162,7 +162,7 @@ export function PrintPreviewDialog({ open, onOpenChange, report }: PrintPreviewD
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             
-            <Button 
+            {/* <Button 
               variant="outline" 
               onClick={handleWhatsAppShare} 
               disabled={wpStatus === 'sending' || wpStatus === 'sent'}
@@ -180,7 +180,7 @@ export function PrintPreviewDialog({ open, onOpenChange, report }: PrintPreviewD
               {wpStatus === 'sent' && 'Report Sent!'}
               {wpStatus === 'no_whatsapp' && 'No WhatsApp on Number'}
               {wpStatus === 'error' && 'Failed to Send'}
-            </Button>
+            </Button> */}
 
             <Button onClick={() => handlePrint()} className="gap-2">
               <Printer className="h-4 w-4" /> Print Document
