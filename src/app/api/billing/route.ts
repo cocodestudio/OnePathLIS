@@ -1,40 +1,10 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { fetchFromLaravel } from "@/lib/api-client";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const bills = await prisma.bill.findMany({
-      where: { labId: session.user.labId },
-      include: {
-        patient: true,
-        lab: true,
-        reports: {
-          include: {
-            results: {
-              include: { 
-                test: {
-                  include: {
-                    parent: {
-                      include: { parent: true }
-                    }
-                  }
-                } 
-              }
-            }
-          }
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-
-    return NextResponse.json(bills);
+    const data = await fetchFromLaravel('/bills');
+    return NextResponse.json(data);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

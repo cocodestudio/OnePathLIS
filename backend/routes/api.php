@@ -37,6 +37,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('lab', [\App\Http\Controllers\Api\Lis\LabController::class, 'update']);
         Route::apiResource('patients', \App\Http\Controllers\Api\Lis\PatientController::class);
         Route::apiResource('tests', \App\Http\Controllers\Api\Lis\TestController::class);
+        Route::post('reports/{report}/tests', [\App\Http\Controllers\Api\Lis\ReportController::class, 'addTests']);
+        Route::delete('reports/{report}/tests', [\App\Http\Controllers\Api\Lis\ReportController::class, 'removeTests']);
         Route::apiResource('reports', \App\Http\Controllers\Api\Lis\ReportController::class);
         Route::apiResource('bills', \App\Http\Controllers\Api\Lis\BillController::class);
         Route::get('analytics', [\App\Http\Controllers\Api\Lis\AnalyticsController::class, 'index']);

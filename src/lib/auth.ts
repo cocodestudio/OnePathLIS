@@ -1,7 +1,5 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "./prisma";
-import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,29 +14,33 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Please enter your email and password");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-          include: { lab: true }
-        });
+        try {
+          const res = await fetch("http://localhost:8000/api/auth/login", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: credentials.email, password: credentials.password })
+          });
+          
+          const data = await res.json();
+          
+          if (!res.ok) {
+            throw new Error(data.message || "Invalid credentials");
+          }
 
-        if (!user) {
-          throw new Error("No user found with this email address");
+          const user = data.user;
+          // Return user and access token
+          return {
+            id: user.id.toString(),
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            labId: user.lab_id,
+            labName: user.lab_name,
+            accessToken: data.access_token
+          };
+        } catch (error: any) {
+          throw new Error(error.message);
         }
-
-        const isValid = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isValid) {
-          throw new Error("Incorrect password");
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          labId: user.labId,
-          labName: user.lab.name
-        };
       }
     })
   ],
@@ -49,6 +51,7 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as any).role;
         token.labId = (user as any).labId;
         token.labName = (user as any).labName;
+        token.accessToken = (user as any).accessToken;
       }
       return token;
     },
@@ -58,6 +61,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).role = token.role;
         (session.user as any).labId = token.labId;
         (session.user as any).labName = token.labName;
+        (session.user as any).accessToken = token.accessToken;
       }
       return session;
     }

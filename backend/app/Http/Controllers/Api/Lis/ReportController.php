@@ -128,4 +128,113 @@ class ReportController extends Controller
 
         return response()->json($report->load('results'));
     }
+
+    public function addTests(Request $request, string $id)
+    {
+        $validated = $request->validate([
+            'testId' => 'required|uuid|exists:tests,id',
+        ]);
+
+        $report = Report::where('lab_id', $request->user()->lab_id)->with('results')->findOrFail($id);
+        $test = \App\Models\Test::where('lab_id', $request->user()->lab_id)->with('subTests.subTests')->findOrFail($validated['testId']);
+
+        $reportTestsData = [];
+        if ($test->subTests->count() > 0) {
+            foreach ($test->subTests as $param) {
+                if ($param->field_type === 'Multiple Field' && $param->subTests->count() > 0) {
+                    foreach ($param->subTests as $subParam) {
+                        $reportTestsData[] = [
+                            'report_id' => $report->id,
+                            'test_id' => $subParam->id,
+                            'result_value' => null,
+                            'is_abnormal' => false,
+                        ];
+                    }
+                } else {
+                    $reportTestsData[] = [
+                        'report_id' => $report->id,
+                        'test_id' => $param->id,
+                        'result_value' => $param->field_type === 'Custom Editor' ? $param->interpretation : null,
+                        'is_abnormal' => false,
+                    ];
+                }
+            }
+        } else {
+            $reportTestsData[] = [
+                'report_id' => $report->id,
+                'test_id' => $test->id,
+                'result_value' => $test->field_type === 'Custom Editor' ? $test->interpretation : null,
+                'is_abnormal' => false,
+            ];
+        }
+
+        $existingTestIds = $report->results->pluck('test_id')->toArray();
+        $toAdd = array_filter($reportTestsData, fn($rt) => !in_array($rt['test_id'], $existingTestIds));
+
+        if (empty($toAdd)) {
+            return response()->json(['error' => 'Test or its parameters already exist in this report.'], 400);
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($toAdd, $report, $test) {
+            foreach ($toAdd as $data) {
+                \App\Models\ReportTest::create($data);
+            }
+
+            if ($report->bill_id) {
+                $bill = \App\Models\Bill::find($report->bill_id);
+                if ($bill) {
+                    $newTotal = $bill->total + $test->price;
+                    $balance = $newTotal - $bill->paid_amount;
+                    $newStatus = 'UNPAID';
+                    if ($balance <= 0) $newStatus = 'PAID';
+                    elseif ($bill->paid_amount > 0) $newStatus = 'PARTIAL';
+
+                    $bill->update(['total' => $newTotal, 'status' => $newStatus]);
+                }
+            }
+        });
+
+        return response()->json(['success' => true, 'addedCount' => count($toAdd)]);
+    }
+
+    public function removeTests(Request $request, string $id)
+    {
+        $validated = $request->validate([
+            'mainTestId' => 'required|uuid|exists:tests,id',
+        ]);
+
+        $report = Report::where('lab_id', $request->user()->lab_id)
+            ->with(['results.test.parent.parent'])
+            ->findOrFail($id);
+
+        $resultIdsToDelete = $report->results->filter(function ($r) use ($validated) {
+            $mt = $r->test->parent?->parent ?? ($r->test->parent ?? $r->test);
+            return $mt->id === $validated['mainTestId'];
+        })->pluck('id')->toArray();
+
+        if (empty($resultIdsToDelete)) {
+            return response()->json(['error' => 'No tests found to remove.'], 404);
+        }
+
+        $test = \App\Models\Test::find($validated['mainTestId']);
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($resultIdsToDelete, $report, $test) {
+            \App\Models\ReportTest::whereIn('id', $resultIdsToDelete)->delete();
+
+            if ($report->bill_id && $test) {
+                $bill = \App\Models\Bill::find($report->bill_id);
+                if ($bill) {
+                    $newTotal = max(0, $bill->total - $test->price);
+                    $balance = $newTotal - $bill->paid_amount;
+                    $newStatus = 'UNPAID';
+                    if ($balance <= 0) $newStatus = 'PAID';
+                    elseif ($bill->paid_amount > 0) $newStatus = 'PARTIAL';
+
+                    $bill->update(['total' => $newTotal, 'status' => $newStatus]);
+                }
+            }
+        });
+
+        return response()->json(['success' => true, 'deletedCount' => count($resultIdsToDelete)]);
+    }
 }

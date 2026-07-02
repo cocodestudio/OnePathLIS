@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { fetchFromLaravel } from "@/lib/api-client";
 
 export async function GET() {
   try {
@@ -10,119 +10,26 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const labId = session.user.labId;
+    const data = await fetchFromLaravel('/analytics');
+    
+    // Convert Laravel's response back to what the frontend expects
+    const analyticsData = {
+      patientsCount: data.totalPatients,
+      reportsCount: data.totalReports,
+      revenueTotal: data.totalRevenue,
+      todayPatients: 0, // Laravel endpoint doesn't return this yet, but frontend expects it
+      todayReports: data.todayReports,
+      todayRevenue: 0, // Laravel doesn't return today's revenue explicitly
+      pendingReports: data.totalReports - data.completedReports,
+      completedReports: data.completedReports,
+      reportsOverTime: [], // Could be added to Laravel later
+      revenueOverTime: [],
+      recentAbnormalTests: []
+    };
 
-    // Time boundaries for Today
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-
-    // 1. Fetch statistics for Today
-    const totalPatientsToday = await prisma.patient.count({
-      where: {
-        labId,
-        createdAt: { gte: startOfToday, lte: endOfToday },
-      },
-    });
-
-    const totalReportsToday = await prisma.report.count({
-      where: {
-        labId,
-        createdAt: { gte: startOfToday, lte: endOfToday },
-      },
-    });
-
-    const pendingReportsToday = await prisma.report.count({
-      where: {
-        labId,
-        status: "PENDING",
-        createdAt: { gte: startOfToday, lte: endOfToday },
-      },
-    });
-
-    const revenueTodayAgg = await prisma.bill.aggregate({
-      where: {
-        labId,
-        createdAt: { gte: startOfToday, lte: endOfToday },
-      },
-      _sum: {
-        total: true,
-      },
-    });
-    const revenueToday = revenueTodayAgg._sum.total || 0;
-
-    // 2. Fetch past 7 days history for trend charts
-    const chartData = [];
-    for (let i = 6; i >= 0; i--) {
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() - i);
-      
-      const start = new Date(targetDate);
-      start.setHours(0, 0, 0, 0);
-      
-      const end = new Date(targetDate);
-      end.setHours(23, 59, 59, 999);
-
-      const dayReportsCount = await prisma.report.count({
-        where: {
-          labId,
-          createdAt: { gte: start, lte: end },
-        },
-      });
-
-      const dayRevenueAgg = await prisma.bill.aggregate({
-        where: {
-          labId,
-          createdAt: { gte: start, lte: end },
-        },
-        _sum: {
-          total: true,
-        },
-      });
-      const dayRevenue = dayRevenueAgg._sum.total || 0;
-
-      chartData.push({
-        date: targetDate.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" }),
-        reports: dayReportsCount,
-        revenue: dayRevenue,
-      });
-    }
-
-    // 3. Fetch category breakdown (CBC vs LFT vs KFT vs Thyroid)
-    const reportTests = await prisma.reportTest.findMany({
-      where: {
-        report: {
-          labId,
-        },
-      },
-      include: {
-        test: true,
-      },
-    });
-
-    const categoryCounts: Record<string, number> = {};
-    reportTests.forEach((rt) => {
-      const cat = rt.test.category;
-      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
-    });
-
-    const categoryData = Object.entries(categoryCounts).map(([name, count]) => ({
-      name,
-      value: count,
-    }));
-
-    return NextResponse.json({
-      stats: {
-        patientsToday: totalPatientsToday,
-        totalReports: totalReportsToday,
-        pendingReports: pendingReportsToday,
-        revenue: revenueToday,
-      },
-      chartData,
-      categoryData,
-    });
+    return NextResponse.json(analyticsData);
   } catch (error: any) {
+    console.error("Analytics Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
